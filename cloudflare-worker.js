@@ -110,7 +110,7 @@ export default {
 
     // ---------- 既定: Gemini プロキシ ----------
     if (request.method !== "POST") return new Response("ok", { headers: c });
-    const MODEL = "gemini-2.5-flash-lite"; // 無料枠が広く高速。混雑/レート制限に強い
+    const MODEL = "gemini-3.1-flash-lite"; // Gemini 3.1 Flash Lite（高速・賢い・無料枠も別枠）
     const gurl = "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=" + env.GEMINI_KEY;
     const body = await request.text();
     const r = await fetch(gurl, { method: "POST", headers: { "Content-Type": "application/json" }, body });
