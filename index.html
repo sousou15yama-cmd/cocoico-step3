@@ -1223,7 +1223,7 @@ const AI_PROXY_URL = "https://cocoico-ai.sousou-15yama.workers.dev";
 async function geminiSearch(userText){
   if(!AI_PROXY_URL) throw {code:'NOKEY'};
   const url=AI_PROXY_URL;
-  const restos=db.where('restaurants',{cafe:0}).slice().sort((a,b)=>a.dist-b.dist).slice(0,70).map(r=>({id:r.id,name:r.name,ジャンル:(r.mood||[]).join('・'),予算:r.price,雰囲気:(r.atmos||[]).join('・'),徒歩:r.dist+'分',一言:(r.point||'').slice(0,40)}));
+  const restos=db.where('restaurants',{cafe:0}).slice().sort((a,b)=>a.dist-b.dist).slice(0,45).map(r=>({id:r.id,name:r.name,ジャンル:(r.mood||[]).join('・'),予算:r.price,雰囲気:(r.atmos||[]).join('・'),徒歩:r.dist+'分',一言:(r.point||'').slice(0,40)}));
   const sys='あなたは吉祥寺の飲食店レコメンドAI「ココ助」。親しみやすいタメ口で話す。'+
     'ユーザーの曖昧・口語的な要望（気分・シーン・予算・人数など）を汲み取り、必ず下の店リストの中だけから最適な店を1〜3軒選ぶ。'+
     'リストにない店は絶対に作らない。idはリストのものを正確に使う。各店に短く具体的な推し理由(reason)を添え、replyは1〜2文で。\n# 店リスト(JSON)\n'+JSON.stringify(restos);
@@ -1290,19 +1290,26 @@ async function aiSend(){
   document.getElementById('simmer').style.display='none';
   document.getElementById('chatChoices').innerHTML=''; document.getElementById('chatResult').innerHTML='';
   aiBusy=true; const typing=showTyping();
-  try{
-    const out=await geminiSearch(text);
-    removeTyping(typing);
+  let out=null, err=null;
+  for(let attempt=0; attempt<3; attempt++){
+    try{ out=await geminiSearch(text); err=null; break; }
+    catch(e){ err=e;
+      const retriable = e.code==='HTTP' && (e.status===429 || e.status===503 || e.status===500);
+      if(retriable && attempt<2){ if(attempt===0) toast('⏳','少し混んでるみたい…待ってるね'); await new Promise(r=>setTimeout(r, 4500)); continue; }
+      break;
+    }
+  }
+  removeTyping(typing);
+  if(out){
     botSay(esc(out.reply||'こんなお店はどう？').replace(/\n/g,'<br>'));
     const picks=(out.picks||[]).map(p=>({r:db.get('restaurants',p.id), reason:p.reason})).filter(x=>x.r);
-    if(picks.length) appendCards(picks);
-    else appendCards(localFuzzy(text));
-  }catch(e){
-    removeTyping(typing);
-    if(e.code!=='NOKEY'){ botSay('うまく繋がらなかった…キーワードから探すね！'); console.warn('AI error', e); }
+    if(picks.length) appendCards(picks); else appendCards(localFuzzy(text));
+  } else {
+    if(err && err.code!=='NOKEY'){ botSay('今ちょっと混んでるみたい💦 キーワードから探すね！'); console.warn('AI error', err); }
     else { botSay('キーワードから、ぴったりの店を探したよ！'); }
     appendCards(localFuzzy(text));
-  } finally { aiBusy=false; }
+  }
+  aiBusy=false;
 }
 
 function startStrict(){
