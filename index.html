@@ -1225,7 +1225,7 @@ let chatIdx=0, chatAns={};
    ※URL自体は公開してOK（秘密の API キーは Proxy の環境変数に置く）
    ※空のままでもアプリは動きます（AI検索はキーワード検索に自動で切替）
    ============================================================ */
-const AI_PROXY_URL = "";
+const AI_PROXY_URL = "https://cocoico-ai.sousou-15yama.workers.dev";
 
 async function geminiSearch(userText){
   if(!AI_PROXY_URL) throw {code:'NOKEY'};
