@@ -1,0 +1,1817 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#FF6A2B">
+<title>COCOiCO — AIに話しかけて、今日のお店探し</title>
+<style>
+/* =======================================================================
+   COCOiCO「Sizzle & Gold ＋」
+   単一HTML / 外部依存ゼロ / file:// 直開きOK / 機能はロジック層に分離
+   ======================================================================= */
+@property --ang { syntax:'<angle>'; initial-value:0deg; inherits:false; }
+
+:root{
+  --bg:#FFF6EC; --surface:#FFFDF9; --surface-sub:#FFF0DD; --ink:#2A1410; --sub:#7A5A48;
+  --line:#EADBC8; --primary:#FF6A2B; --primary-press:#E5571C; --secondary:#C0341C;
+  --accent:#FFC23C; --accent-deep:#FFB02E; --success:#2E9E6B; --danger:#D64541;
+  --rare-legend:#FFC23C; --rare-mid:#FF6A2B; --rare-common:#C0341C; --on-primary:#FFFFFF;
+  --cafe-band-a:#3A2418; --cafe-band-b:#5A3A22; --cafe-bg:#FBF1E2;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px; --space-6:32px; --space-7:48px;
+  --app-max:460px; --tap-min:44px;
+  --fs-h1:clamp(28px,7vw,34px); --fs-h2:22px; --fs-card:18px; --fs-body:15px; --fs-sub:13px; --fs-score:34px; --fs-score-xl:48px;
+  --lh-head:1.15; --lh-body:1.7; --ls-head:-0.02em;
+  --z-nav:50; --z-overlay:90; --z-modal:100;
+  --dur-fast:120ms; --dur-base:260ms; --dur-trans:520ms;
+  --ease-out:cubic-bezier(.22,1,.36,1); --ease-overshoot:cubic-bezier(.34,1.56,.64,1); --ease-wipe:cubic-bezier(.7,0,.2,1);
+  --grad-bg:radial-gradient(120% 90% at 50% 0%, #FFE9C7 0%, #FFF6EC 46%, #FFEFD9 100%);
+  --grad-primary:linear-gradient(135deg, #FF8A3D 0%, #FF6A2B 48%, #E5431A 100%);
+  --grad-gold:linear-gradient(180deg, #FFD25A 0%, #FFB02E 55%, #FF7A2F 100%);
+  --grad-quiz:linear-gradient(135deg, #FF7A2F 0%, #FF9F1C 100%);
+  --grad-text:linear-gradient(135deg, #FF8A3D 0%, #C0341C 100%);
+  --grad-glow:radial-gradient(60% 60% at 50% 30%, rgba(255,210,90,.55) 0%, rgba(255,106,43,0) 70%);
+  --grad-cafe:linear-gradient(135deg, #3A2418 0%, #5A3A22 100%);
+  --sh-1:0 1px 2px rgba(80,40,20,.06), 0 2px 8px rgba(80,40,20,.05);
+  --sh-2:0 4px 14px rgba(120,60,25,.10);
+  --sh-3:0 10px 30px rgba(120,60,25,.16);
+  --sh-press:0 1px 3px rgba(120,60,25,.12);
+  --sh-fab:0 6px 18px rgba(255,106,43,.42);
+  --sh-glow-gold:0 0 0 1px rgba(255,194,60,.4), 0 0 22px rgba(255,178,46,.45);
+  --sh-inset:inset 0 1px 0 rgba(255,255,255,.6);
+  --r-xs:8px; --r-sm:12px; --r-md:16px; --r-lg:22px; --r-xl:28px; --r-pill:999px; --r-bubble:22px 22px 22px 6px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#1A1008; --surface:#241710; --surface-sub:#2E1E13; --ink:#FCEBD8; --sub:#C7A488;
+    --line:#3D2A1C; --cafe-bg:#211710;
+    --grad-bg:radial-gradient(120% 90% at 50% 0%, #3A220F 0%, #1A1008 52%, #241405 100%);
+    --sh-1:0 1px 2px rgba(0,0,0,.4); --sh-2:0 6px 18px rgba(0,0,0,.45); --sh-3:0 12px 34px rgba(0,0,0,.55);
+    --sh-press:0 1px 3px rgba(0,0,0,.5); --sh-inset:inset 0 1px 0 rgba(255,255,255,.08);
+  }
+}
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0; padding:0;}
+body{
+  font-family:-apple-system,"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
+  font-feature-settings:"palt" 1; color:var(--ink); background:var(--bg);
+  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
+}
+body::before{ /* 背景グラデ + 極薄ノイズ */
+  content:""; position:fixed; inset:0; z-index:-2; background:var(--grad-bg);
+}
+body::after{
+  content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.5;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.012) 0 1px, transparent 1px 2px);
+}
+.app{ max-width:var(--app-max); margin:0 auto; padding:0 0 calc(96px + env(safe-area-inset-bottom)); position:relative; min-height:100vh; }
+.num{ font-variant-numeric:tabular-nums; font-feature-settings:'tnum'; font-weight:800; }
+.score-skew{ display:inline-block; transform:skewX(-6deg); }
+.grad-text{
+  color:var(--secondary);
+  background:var(--grad-text); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+@media (prefers-color-scheme: dark){ .grad-text{ background:var(--grad-gold); -webkit-background-clip:text; background-clip:text; } }
+
+/* ---------- プリン・タップ（全タップ要素の気持ちよさ） ---------- */
+.tap{ transition:transform var(--dur-base) var(--ease-overshoot), box-shadow var(--dur-fast) linear; touch-action:manipulation; }
+.tap:active{ transform:scale(.95); transition:transform 70ms ease-out; }
+
+/* =================== ヘッダー（暖簾） =================== */
+header.noren{
+  position:sticky; top:0; z-index:var(--z-nav); padding:env(safe-area-inset-top) 0 0;
+}
+.noren-in{
+  position:relative; margin:0; padding:14px 16px 16px; color:var(--on-primary);
+  background:var(--grad-primary); border-radius:0 0 var(--r-lg) var(--r-lg);
+  box-shadow:0 6px 18px rgba(229,67,26,.28); display:flex; align-items:center; gap:10px;
+  transition:padding var(--dur-base) var(--ease-out);
+  overflow:hidden;
+}
+header.shrunk .noren-in{ padding-top:8px; padding-bottom:10px; }
+.steam{ position:absolute; top:-8px; width:10px; height:34px; border-radius:50%; background:rgba(255,255,255,.5);
+  filter:blur(7px); opacity:0; animation:steam 4.6s ease-in-out infinite; pointer-events:none; }
+.steam.s1{ left:24%; animation-delay:.2s;} .steam.s2{ left:50%; animation-delay:1.6s; height:42px;} .steam.s3{ left:74%; animation-delay:3s;}
+@keyframes steam{ 0%{opacity:0; transform:translateY(6px) scaleX(1);} 30%{opacity:.55;} 100%{opacity:0; transform:translateY(-30px) scaleX(1.7);} }
+.logo{ font-size:25px; font-weight:800; letter-spacing:.4px; line-height:1; position:relative; }
+.logo .dot{ position:relative; }
+.logo .dot::after{ content:""; position:absolute; top:-2px; left:50%; transform:translateX(-50%); width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 2px rgba(255,255,255,.5);}
+.logo-sub{ font-size:10.5px; opacity:.96; margin-top:5px; font-weight:600; letter-spacing:.3px;}
+.h-right{ margin-left:auto; display:flex; align-items:center; gap:8px;}
+.icon-btn{ width:40px; height:40px; border:none; border-radius:50%; background:rgba(255,255,255,.22); color:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(3px);}
+.pts-pill{ display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.92); color:var(--secondary); border-radius:var(--r-pill); padding:7px 13px 7px 11px; box-shadow:var(--sh-1); }
+.pts-pill .c{ font-size:15px;}
+.pts-pill b{ font-size:16px; line-height:1;}
+.pts-pill small{ font-size:9px; color:var(--sub); display:block; margin-top:1px;}
+
+/* =================== 共通：見出し =================== */
+main{ padding:18px 14px 0; position:relative; }
+section{ display:none; }
+section.active{ display:block; animation:viewIn var(--dur-base) var(--ease-out); }
+@keyframes viewIn{ from{opacity:0; transform:translateY(14px) scale(.985);} to{opacity:1; transform:none;} }
+h2.title{ font-size:var(--fs-h2); font-weight:800; letter-spacing:var(--ls-head); margin:2px 2px 6px; display:flex; align-items:center; gap:9px; }
+h2.title .te{ font-size:24px; }
+p.lead{ color:var(--sub); font-size:var(--fs-sub); margin:0 2px 18px; line-height:var(--lh-body); }
+
+/* =================== ホーム =================== */
+.hero{ text-align:center; padding:8px 6px 4px; }
+.hero h1{ font-size:var(--fs-h1); line-height:var(--lh-head); letter-spacing:var(--ls-head); margin:2px 0 8px; font-weight:800;}
+.hero .logo-big{ font-size:40px; font-weight:800; letter-spacing:1px; }
+.hero .copy{ font-size:14px; color:var(--ink); font-weight:700; margin:0 0 4px; }
+.hero .greet{ font-size:12px; color:var(--sub); }
+
+.scoreboard{ display:flex; gap:9px; overflow-x:auto; padding:16px 2px 6px; margin:0 -2px; scrollbar-width:none; }
+.scoreboard::-webkit-scrollbar{ display:none; }
+.medal{ flex:0 0 auto; min-width:84px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-md);
+  padding:11px 12px; box-shadow:var(--sh-1); text-align:center; position:relative; }
+.medal .mv{ font-size:23px; color:var(--secondary); line-height:1; }
+.medal .ml{ font-size:10px; color:var(--sub); margin-top:5px; }
+.medal .floatp{ position:absolute; top:2px; right:8px; font-size:13px; font-weight:800; color:var(--success); opacity:0; }
+.medal.flash .mv{ animation:flashv .5s ease; }
+@keyframes flashv{ 0%{color:var(--accent-deep); transform:scale(1.18);} 100%{color:var(--secondary); transform:none;} }
+
+.modes{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0 14px; }
+.mode{ position:relative; border:none; cursor:pointer; text-align:left; border-radius:var(--r-lg); padding:16px 14px 15px;
+  background:var(--surface); box-shadow:var(--sh-2), var(--sh-inset); overflow:hidden; min-height:128px;
+  opacity:0; transform:perspective(600px) rotateX(-12deg) translateY(20px); animation:peelin .5s var(--ease-out) forwards; animation-delay:var(--d,0ms);}
+@keyframes peelin{ to{opacity:1; transform:none;} }
+.mode::before{ content:""; position:absolute; inset:0 0 auto 0; height:64%; opacity:.16; }
+.mode.m-strict::before{ background:var(--grad-primary);}
+.mode.m-roulette::before{ background:var(--grad-gold);}
+.mode.m-quiz::before{ background:var(--grad-quiz);}
+.mode.m-cafe::before{ background:var(--grad-cafe);}
+.mode .me-emoji{ font-size:34px; display:block; line-height:1; filter:drop-shadow(0 6px 10px rgba(255,106,43,.35)); position:relative;}
+.mode .mname{ font-size:var(--fs-card); font-weight:800; display:block; margin-top:10px; letter-spacing:var(--ls-head); }
+.mode .mdesc{ font-size:11px; color:var(--sub); display:block; margin-top:4px; line-height:1.45; font-weight:600;}
+.mode:active{ box-shadow:var(--sh-press); }
+
+.cta-row{ margin:2px 0 6px; }
+.btn-discover{ width:100%; border:none; cursor:pointer; border-radius:var(--r-lg); padding:16px; color:var(--on-primary); font-weight:800; font-size:15px;
+  background:var(--grad-primary); box-shadow:var(--sh-fab); display:flex; align-items:center; justify-content:center; gap:8px; }
+
+.note{ font-size:10.5px; color:var(--sub); text-align:center; margin:20px 8px 6px; line-height:1.7; }
+
+/* =================== 下部ナビ + FAB =================== */
+nav.dock{ position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:var(--app-max); z-index:var(--z-nav);
+  display:flex; align-items:flex-end; padding:8px 8px calc(10px + env(safe-area-inset-bottom));
+  background:rgba(255,253,249,.82); -webkit-backdrop-filter:blur(18px) saturate(160%); backdrop-filter:blur(18px) saturate(160%);
+  border-top:1px solid var(--line); transition:transform var(--dur-base) var(--ease-out);}
+@media (prefers-color-scheme: dark){ nav.dock{ background:rgba(36,23,16,.82);} }
+nav.dock button.navb{ flex:1; border:none; background:none; cursor:pointer; color:var(--sub); font-size:10px; font-weight:700;
+  display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 0 2px; position:relative; }
+nav.dock .ni{ font-size:21px; line-height:1; filter:grayscale(.85); opacity:.6; transition:transform var(--dur-base) var(--ease-overshoot), filter var(--dur-base), opacity var(--dur-base);}
+nav.dock button.navb.on{ color:var(--secondary);}
+nav.dock button.navb.on .ni{ filter:none; opacity:1; transform:translateY(-3px) scale(1.06);}
+nav.dock button.navb.on::after{ content:""; position:absolute; bottom:-1px; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent-deep);}
+.fab-wrap{ flex:0 0 64px; display:flex; justify-content:center; align-items:flex-start; }
+.fab{ width:60px; height:60px; margin-top:-22px; border:none; border-radius:50%; cursor:pointer; color:#fff; font-size:13px; font-weight:800;
+  background:var(--grad-primary); box-shadow:var(--sh-fab); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; position:relative;}
+.fab::before{ content:""; position:absolute; inset:-5px; border-radius:50%; background:var(--grad-glow); opacity:.0; animation:fabglow 2.4s ease-in-out infinite; z-index:-1;}
+.fab .fi{ font-size:20px; line-height:1;}
+.fab .fl{ font-size:8.5px;}
+@keyframes fabglow{ 0%,100%{opacity:.25; transform:scale(.92);} 50%{opacity:.7; transform:scale(1.08);} }
+
+/* =================== 店舗カード =================== */
+.resto{ position:relative; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:14px 14px 14px 20px;
+  margin-bottom:12px; box-shadow:var(--sh-2), var(--sh-inset); overflow:hidden;
+  opacity:0; transform:translateY(14px); animation:plate .5s var(--ease-out) forwards; animation-delay:var(--d,0ms);}
+@keyframes plate{ to{opacity:1; transform:none;} }
+.resto .rarity{ position:absolute; left:0; top:0; bottom:0; width:5px; }
+.resto.r-legend .rarity{ background:var(--rare-legend);} .resto.r-mid .rarity{ background:var(--rare-mid);} .resto.r-common .rarity{ background:var(--rare-common);}
+.rtop{ display:flex; align-items:flex-start; gap:11px;}
+.resto .emoji{ font-size:38px; flex:0 0 auto; line-height:1; filter:drop-shadow(0 5px 8px rgba(255,106,43,.3));}
+.resto h3{ margin:0; font-size:var(--fs-card); font-weight:800; letter-spacing:var(--ls-head);}
+.resto .meta{ font-size:11.5px; color:var(--sub); margin-top:3px; line-height:1.5;}
+.badges{ margin-top:7px; display:flex; flex-wrap:wrap; gap:5px;}
+.badge{ font-size:10.5px; font-weight:800; padding:3px 9px; border-radius:var(--r-pill); border:1px solid transparent; }
+.b-niche-legend{ background:rgba(255,194,60,.16); color:#9a6b00; border-color:rgba(255,194,60,.5);}
+.b-niche-mid{ background:rgba(255,106,43,.12); color:#b8430f; border-color:rgba(255,106,43,.4);}
+.b-niche-common{ background:rgba(192,52,28,.1); color:#9c2a16; border-color:rgba(192,52,28,.35);}
+.b-mood{ background:var(--surface-sub); color:var(--sub); }
+.b-yum{ background:rgba(46,158,107,.12); color:#1c7e56;}
+.b-new{ background:var(--grad-primary); color:#fff;}
+.score-chip{ margin-left:auto; flex:0 0 auto; text-align:center; background:var(--surface-sub); border-radius:var(--r-md); padding:6px 9px; min-width:52px;}
+.score-chip b{ font-size:21px; color:var(--secondary); line-height:1; display:block;}
+.score-chip small{ font-size:8.5px; color:var(--sub);}
+.point{ font-size:13px; line-height:var(--lh-body); margin:11px 0 0; background:var(--surface-sub); border-radius:0 var(--r-sm) var(--r-sm) 0; border-left:3px solid var(--accent-deep); padding:9px 12px;}
+.links{ display:flex; gap:8px; margin-top:11px;}
+.links a{ flex:1; text-align:center; text-decoration:none; font-size:12.5px; font-weight:800; padding:11px; border-radius:var(--r-sm); position:relative; overflow:hidden;}
+.l-hp{ background:#E60044; color:#fff;}
+.l-tb{ background:var(--surface); color:#E07A1A; border:1.5px solid #FFCF9E;}
+.favbtn{ flex:0 0 46px; border:1.5px solid var(--line); background:var(--surface); border-radius:var(--r-sm); font-size:17px; cursor:pointer; line-height:1; transition:transform var(--dur-base) var(--ease-overshoot), border-color var(--dur-base);}
+.favbtn.on{ border-color:var(--danger); }
+.favbtn.on{ transform:scale(1.04); }
+
+/* =================== チップ & ボタン =================== */
+.btn{ display:flex; align-items:center; justify-content:center; gap:8px; width:100%; border:none; border-radius:var(--r-md); padding:15px; font-size:15px; font-weight:800;
+  color:var(--on-primary); background:var(--grad-primary); cursor:pointer; box-shadow:var(--sh-fab); margin-top:4px;}
+.btn.ghost{ background:var(--surface); color:var(--secondary); border:1.5px solid var(--primary); box-shadow:none;}
+.btn.sm{ padding:12px; font-size:13.5px;}
+.btn:disabled{ opacity:.5; }
+.qlabel{ font-size:13.5px; font-weight:800; margin:2px 2px 10px; letter-spacing:var(--ls-head);}
+.chips{ display:flex; flex-wrap:wrap; gap:8px;}
+.chip{ position:relative; border:1.5px solid var(--line); background:var(--surface); border-radius:var(--r-pill); padding:9px 14px; font-size:13px; font-weight:700;
+  color:var(--ink); cursor:pointer; user-select:none; overflow:hidden; isolation:isolate;}
+.chip::before{ content:""; position:absolute; inset:0; z-index:-1; background:var(--grad-primary); transform:scaleX(0); transform-origin:left; transition:transform var(--dur-base) var(--ease-out);}
+.chip.sel{ color:var(--on-primary); border-color:transparent; font-weight:800;}
+.chip.sel::before{ transform:scaleX(1);}
+.chip.sel::after{ content:"✓"; margin-left:6px; font-weight:900;}
+
+.card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-2), var(--sh-inset); padding:16px; margin-bottom:14px;}
+
+/* =================== 厳選チャット =================== */
+#strict .simmer{ display:flex; gap:5px; justify-content:center; margin:0 0 14px; font-size:18px; }
+#strict .simmer .ing{ opacity:.25; filter:grayscale(1); transition:all var(--dur-base) var(--ease-overshoot);}
+#strict .simmer .ing.lit{ opacity:1; filter:none; transform:translateY(-2px) scale(1.1);}
+#chatLog{ display:flex; flex-direction:column; gap:10px; margin-bottom:10px;
+  background:repeating-linear-gradient(0deg, transparent 0 23px, rgba(234,219,200,.25) 23px 24px); padding:6px 2px; border-radius:var(--r-md);}
+.bubble{ max-width:84%; padding:11px 14px; font-size:13.5px; line-height:var(--lh-body); animation:pop .3s var(--ease-out);}
+@keyframes pop{ from{opacity:0; transform:translateY(8px) scale(.96);} to{opacity:1; transform:none;} }
+.bot{ align-self:flex-start; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-bubble); box-shadow:var(--sh-1);}
+.bot .who{ font-size:11px; color:var(--secondary); font-weight:800; margin-bottom:3px; display:flex; align-items:center; gap:6px;}
+.bot .who .av{ display:inline-flex; width:20px; height:20px; border-radius:50%; align-items:center; justify-content:center; background:var(--accent); box-shadow:0 0 10px rgba(255,178,46,.7); font-size:12px;}
+.me{ align-self:flex-end; background:var(--grad-primary); color:var(--on-primary); border-radius:22px 22px 6px 22px; font-weight:700;}
+.typing{ display:inline-flex; gap:4px; padding:2px 0;}
+.typing i{ width:7px; height:7px; border-radius:50%; background:var(--sub); animation:typ 1s infinite;}
+.typing i:nth-child(2){ animation-delay:.15s;} .typing i:nth-child(3){ animation-delay:.3s;}
+@keyframes typ{ 0%,60%,100%{ transform:translateY(0); opacity:.4;} 30%{ transform:translateY(-5px); opacity:1;} }
+#chatChoices .chip{ animation:slidein .35s var(--ease-out) both;}
+@keyframes slidein{ from{opacity:0; transform:translateX(-12px);} to{opacity:1; transform:none;} }
+
+/* =================== ルーレット =================== */
+.wheelwrap{ position:relative; width:280px; height:280px; margin:6px auto 16px;}
+.pointer{ position:absolute; top:-4px; left:50%; transform:translateX(-50%); z-index:5; font-size:30px; filter:drop-shadow(0 3px 3px rgba(0,0,0,.25));}
+#wheel{ width:100%; height:100%; border-radius:50%; border:8px solid var(--surface);
+  box-shadow:0 12px 34px rgba(120,60,25,.28), inset 0 0 0 4px rgba(255,210,90,.6), var(--sh-glow-gold); will-change:transform;}
+.hub{ position:absolute; top:50%; left:50%; width:64px; height:64px; margin:-32px 0 0 -32px; border-radius:50%;
+  background:var(--surface); box-shadow:0 5px 14px rgba(0,0,0,.25); display:flex; align-items:center; justify-content:center; font-size:26px; z-index:4;}
+.scope{ display:flex; gap:8px; margin:0 0 14px; }
+.scope .chip{ flex:1; text-align:center; justify-content:center; display:flex; align-items:center; white-space:nowrap; font-size:12.5px; padding:11px 8px;}
+.scope .chip.sel::after{ content:none; }
+.spin-cta{ position:relative; width:100%; border:none; border-radius:var(--r-lg); padding:17px; color:#fff; font-weight:800; font-size:16px; cursor:pointer;
+  background:var(--grad-primary); box-shadow:var(--sh-fab); overflow:hidden;}
+.spin-cta::after{ content:""; position:absolute; inset:0; background:var(--grad-glow); opacity:.0; animation:fabglow 2.2s ease-in-out infinite;}
+.spin-cta:disabled{ opacity:.65;}
+.win-banner{ text-align:center; font-size:13px; font-weight:800; color:var(--secondary); margin:2px 0 10px; }
+.win-name{ font-size:24px; font-weight:800; text-align:center; margin:4px 0 12px; letter-spacing:var(--ls-head); animation:riseup .5s var(--ease-overshoot);}
+@keyframes riseup{ from{opacity:0; transform:translateY(18px) scale(.9);} to{opacity:1; transform:none;} }
+
+/* =================== 店舗登録 =================== */
+.field{ margin-bottom:14px;}
+.field label{ font-size:13px; font-weight:800; display:block; margin-bottom:7px;}
+.field input,.field textarea,.field select{ width:100%; border:1.5px solid var(--line); border-radius:var(--r-sm); padding:12px; font-size:14px; font-family:inherit; background:var(--surface); color:var(--ink);}
+.field textarea{ resize:vertical; min-height:62px;}
+.field input:focus,.field textarea:focus,.field select:focus{ outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(255,106,43,.14);}
+.checkrow{ font-size:13px; display:flex; align-items:center; gap:9px; margin-bottom:14px; font-weight:700;}
+.checkrow input{ width:auto; transform:scale(1.2);}
+
+/* =================== クイズ =================== */
+.titlebar{ display:flex; align-items:center; gap:11px; background:var(--grad-quiz); color:#fff; border-radius:var(--r-lg); padding:14px 16px; margin-bottom:14px; box-shadow:var(--sh-2);}
+.titlebar .crown{ font-size:28px;}
+.titlebar b{ font-size:16px; font-weight:800;}
+.titlebar small{ display:block; font-size:11px; opacity:.92; margin-top:2px;}
+.combo{ margin-left:auto; text-align:center; background:rgba(0,0,0,.16); border-radius:var(--r-md); padding:6px 11px;}
+.combo .cv{ font-size:20px; line-height:1;}
+.combo .cl{ font-size:8.5px; opacity:.9;}
+.qcard{ text-align:center;}
+.qnum{ font-size:11px; color:var(--secondary); font-weight:800; letter-spacing:1px;}
+.qtext{ font-size:17px; font-weight:800; margin:10px 4px 18px; line-height:1.55; letter-spacing:var(--ls-head);}
+.qopts{ display:flex; flex-direction:column; gap:10px;}
+.qopt{ border:1.5px solid var(--line); background:var(--surface); border-radius:var(--r-md); padding:14px; font-size:14px; cursor:pointer; text-align:left; font-weight:700; color:var(--ink); position:relative; padding-left:42px;}
+.qopt::before{ content:attr(data-k); position:absolute; left:12px; top:50%; transform:translateY(-50%); width:22px; height:22px; border-radius:50%; background:var(--surface-sub); color:var(--sub); font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center;}
+.qopt.correct{ background:rgba(46,158,107,.12); border-color:var(--success); color:#147a54; box-shadow:0 0 0 3px rgba(46,158,107,.18);}
+.qopt.correct::before{ content:"✓"; background:var(--success); color:#fff;}
+.qopt.wrong{ background:rgba(214,69,65,.1); border-color:var(--danger); color:#b3322e; animation:shake .4s;}
+.qopt.wrong::before{ content:"✕"; background:var(--danger); color:#fff;}
+@keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
+.qopt:disabled{ cursor:default;}
+.explain{ margin-top:16px; text-align:left; background:var(--surface-sub); border-radius:var(--r-md); padding:14px; font-size:13px; line-height:var(--lh-body); animation:pop .3s var(--ease-out);}
+.explain .lead-next{ margin-top:10px; font-weight:800; color:var(--secondary);}
+
+/* =================== 喫茶 =================== */
+#cafe{ }
+.cafe-hd{ background:var(--grad-cafe); color:#F4E6D2; border-radius:var(--r-lg); padding:14px 16px; margin-bottom:14px; box-shadow:var(--sh-2); position:relative; overflow:hidden;}
+.cafe-hd .cs{ position:absolute; top:-6px; right:30px; width:8px; height:28px; border-radius:50%; background:rgba(255,255,255,.35); filter:blur(6px); animation:steam 5s ease-in-out infinite;}
+.cafe-hd h3{ margin:0; font-size:16px; font-weight:800;}
+.cafe-hd p{ margin:5px 0 0; font-size:11.5px; opacity:.85; line-height:1.6;}
+.resto.cafe-card{ background:var(--cafe-bg);}
+.seg{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:14px;}
+
+/* =================== トースト / 演出オーバーレイ =================== */
+#toast{ position:fixed; left:50%; bottom:calc(98px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(16px) rotate(-2deg); z-index:var(--z-overlay);
+  background:var(--ink); color:#fff; padding:12px 18px; border-radius:14px 14px 14px 4px; font-size:13px; font-weight:800; box-shadow:var(--sh-3);
+  opacity:0; pointer-events:none; transition:all var(--dur-base) var(--ease-overshoot); max-width:88%; text-align:center; display:flex; align-items:center; gap:8px;}
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0) rotate(-2deg);}
+#toast.gold{ border:2px solid var(--accent); }
+
+#fxCanvas{ position:fixed; inset:0; z-index:var(--z-modal); pointer-events:none; display:none;}
+#wipe{ position:fixed; inset:0; z-index:var(--z-overlay); background:var(--grad-primary); clip-path:circle(0% at var(--wx,50%) var(--wy,0%)); pointer-events:none;}
+#flyer{ position:fixed; z-index:calc(var(--z-overlay) + 1); font-size:34px; pointer-events:none; display:none; will-change:transform; filter:drop-shadow(0 6px 10px rgba(255,106,43,.4));}
+
+#modalLayer{ position:fixed; inset:0; z-index:var(--z-modal); display:none; align-items:center; justify-content:center; padding:20px;
+  background:rgba(42,20,16,.42); -webkit-backdrop-filter:blur(3px); backdrop-filter:blur(3px);}
+#modalLayer.show{ display:flex;}
+.praise{ background:var(--surface); border-radius:var(--r-xl); padding:26px 24px 22px; box-shadow:var(--sh-3); text-align:center; max-width:320px; width:100%;
+  transform:scale(.6); opacity:0; transition:transform 380ms var(--ease-overshoot), opacity 200ms;}
+#modalLayer.show .praise{ transform:scale(1); opacity:1;}
+.praise .big{ font-size:50px; line-height:1;}
+.praise h3{ margin:8px 0 4px; font-size:21px; font-weight:800;}
+.praise p{ margin:0 0 8px; font-size:13px; color:var(--sub); line-height:var(--lh-body);}
+.praise .gain{ font-size:26px; font-weight:800; color:var(--success); margin:6px 0; white-space:nowrap;}
+/* 開拓者カード（conic shine） */
+.pioneer{ position:relative; border-radius:var(--r-md); padding:2px; margin:12px 0 6px; background:conic-gradient(from var(--ang), #FFD25A, #FF6A2B, #C0341C, #FFD25A); animation:shine 3.2s linear infinite;}
+@keyframes shine{ to{ --ang:360deg; } }
+.pioneer .inner{ background:var(--surface); border-radius:14px; padding:13px 14px; text-align:left;}
+.pioneer .pt{ font-size:10px; color:var(--sub); font-weight:800; letter-spacing:1px;}
+.pioneer .pn{ font-size:16px; font-weight:800; margin:3px 0 2px;}
+.pioneer .pd{ font-size:11px; color:var(--sub);}
+.praise .modal-actions{ display:flex; gap:9px; margin-top:12px;}
+.praise .modal-actions .btn{ margin-top:0;}
+
+/* =================== スプラッシュ =================== */
+#splash{ position:fixed; inset:0; z-index:200; background:var(--grad-primary); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#fff;
+  transition:opacity .5s ease, visibility .5s;}
+#splash.gone{ opacity:0; visibility:hidden; pointer-events:none;}
+#splash .sp-logo{ font-size:46px; font-weight:800; letter-spacing:1px; animation:sppop .7s var(--ease-overshoot);}
+#splash .sp-sub{ font-size:13px; opacity:.95; font-weight:700; animation:viewIn .8s var(--ease-out) .2s both;}
+#splash .sp-steam{ position:absolute; top:38%; width:12px; height:40px; border-radius:50%; background:rgba(255,255,255,.5); filter:blur(8px); animation:steam 3.5s ease-in-out infinite;}
+@keyframes sppop{ from{opacity:0; transform:scale(.6) translateY(10px);} to{opacity:1; transform:none;} }
+
+.empty{ text-align:center; color:var(--sub); font-size:13px; padding:30px 10px; line-height:1.7;}
+
+/* =================== reduced motion =================== */
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:90ms !important;}
+  .steam,.cafe-hd .cs,#splash .sp-steam,.fab::before,.spin-cta::after{ animation:none !important; opacity:.4;}
+  section.active{ animation:fade .18s ease;}
+  @keyframes fade{ from{opacity:0;} to{opacity:1;} }
+}
+
+/* =================== Step2: 追加コンポーネント =================== */
+/* 7タブ用にドックを圧縮 */
+.dock7 .navb{ font-size:9px; }
+.dock7 .navb .ni{ font-size:19px; }
+.dock7{ padding-left:4px; padding-right:4px; }
+
+/* 登録者ラベル */
+.reg-by{ display:inline-block; font-size:10px; color:var(--sub); background:var(--surface-sub); border-radius:var(--r-pill); padding:1px 7px; margin-left:4px; }
+
+/* 共起レコメンド */
+.cooccur{ margin-top:11px; background:var(--surface-sub); border-radius:var(--r-md); padding:10px 11px; }
+.cooccur-h{ font-size:11.5px; font-weight:800; color:var(--secondary); margin-bottom:8px; }
+.cooccur-empty{ font-size:11.5px; color:var(--sub); line-height:1.6; }
+.co-row{ display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+.co-row::-webkit-scrollbar{ display:none; }
+.co-card{ flex:0 0 110px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-sm); padding:9px; box-shadow:var(--sh-1); }
+.co-emoji{ font-size:24px; line-height:1; }
+.co-name{ font-size:11.5px; font-weight:800; margin:5px 0 6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.co-bar{ height:6px; background:var(--line); border-radius:999px; overflow:hidden; }
+.co-bar>i{ display:block; height:100%; background:var(--grad-gold); }
+.co-meta{ font-size:9.5px; color:var(--sub); margin-top:5px; }
+
+/* クイズ正答率バッジ */
+.qbadges{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin:2px 0 6px; }
+.qbadge{ font-size:11px; font-weight:800; color:var(--secondary); background:var(--surface-sub); border-radius:var(--r-pill); padding:5px 11px; }
+.qbadge.prov{ color:#fff; background:var(--accent-deep); }
+.qbadge small{ color:var(--sub); font-weight:700; }
+.explain-ev{ margin-top:8px; font-size:12px; font-weight:800; color:var(--secondary); background:#fff; border-radius:var(--r-sm); padding:7px 10px; }
+.ab-tag{ display:inline-block; margin-top:6px; font-size:11px; font-weight:800; color:var(--sub); background:var(--surface-sub); border-radius:var(--r-pill); padding:2px 10px; }
+
+/* ダッシュボード */
+.dash-block{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-2),var(--sh-inset); padding:15px; margin-bottom:14px; }
+.dash-block.tiny{ text-align:center; font-size:10.5px; color:var(--sub); padding:11px; }
+.dash-h{ font-size:15px; font-weight:800; margin:0 0 4px; letter-spacing:var(--ls-head); }
+.dash-note{ font-size:11px; color:var(--sub); margin-bottom:12px; }
+.rank-row{ display:flex; align-items:center; gap:9px; padding:8px 0; border-bottom:1px dashed var(--line); }
+.rank-row:last-child{ border-bottom:none; }
+.rank-no{ flex:0 0 26px; text-align:center; font-size:15px; font-weight:800; color:var(--secondary); }
+.rank-emoji{ font-size:24px; }
+.rank-main{ flex:1; min-width:0; }
+.rank-name{ font-size:12.5px; font-weight:800; display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.rank-bar{ display:flex; height:7px; border-radius:999px; overflow:hidden; background:var(--line); margin:5px 0 3px; }
+.rank-bar>i{ display:block; height:100%; }
+.seg-reg{ background:var(--secondary); } .seg-fav{ background:var(--accent-deep); } .seg-spin{ background:#FFD8A8; }
+.rank-sub{ font-size:10px; color:var(--sub); }
+.rank-score{ flex:0 0 auto; font-size:20px; color:var(--secondary); transform:skewX(-6deg); }
+.stat-card{ background:var(--surface-sub); border-radius:var(--r-md); padding:11px 12px; margin-bottom:10px; }
+.stat-card:last-child{ margin-bottom:0; }
+.stat-t{ font-size:12.5px; font-weight:800; margin-bottom:8px; }
+.stat-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; text-align:center; }
+.stat-grid b{ font-size:17px; color:var(--secondary); display:block; line-height:1.1; }
+.stat-grid small{ font-size:9px; color:var(--sub); }
+.stat-i{ font-size:10.5px; color:var(--sub); margin-top:8px; }
+.freq-t{ font-size:11.5px; font-weight:800; margin:12px 0 6px; color:var(--ink); }
+.dbar{ display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+.dbar-l{ flex:0 0 88px; font-size:10.5px; color:var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dbar-t{ flex:1; height:12px; background:var(--line); border-radius:999px; overflow:hidden; }
+.dbar-t>i{ display:block; height:100%; border-radius:999px; }
+.dbar-v{ flex:0 0 auto; font-size:10.5px; font-weight:800; color:var(--ink); }
+.dbar-v small{ color:var(--sub); font-weight:700; }
+.qd-row{ display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px dashed var(--line); }
+.qd-q{ flex:0 0 34%; font-size:10.5px; color:var(--ink); overflow:hidden; }
+.qd-bar{ flex:1; height:9px; background:var(--line); border-radius:999px; overflow:hidden; }
+.qd-bar>i{ display:block; height:100%; background:var(--grad-quiz); }
+.qd-v{ flex:0 0 auto; font-size:10px; color:var(--sub); }
+.qd-v b{ color:var(--secondary); }
+.ab-bars{ margin-bottom:10px; }
+.ab-bar{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+.ab-l{ flex:0 0 88px; font-size:11px; font-weight:800; }
+.ab-t{ flex:1; height:14px; background:var(--line); border-radius:999px; overflow:hidden; }
+.ab-t>i{ display:block; height:100%; border-radius:999px; }
+.ab-v{ flex:0 0 auto; font-size:11px; font-weight:800; }
+.ab-v small{ color:var(--sub); font-weight:700; }
+.ab-res{ background:var(--surface-sub); border-radius:var(--r-md); padding:11px; font-size:13px; }
+.ab-badge{ display:inline-block; font-size:11px; font-weight:800; padding:3px 10px; border-radius:var(--r-pill); margin-right:8px; }
+.ab-badge.sig{ background:rgba(46,158,107,.16); color:#147a54; } .ab-badge.ns{ background:var(--line); color:var(--sub); }
+.ab-nums{ font-size:11px; color:var(--sub); margin-top:7px; }
+.ab-detail{ font-size:11px; color:var(--sub); margin-top:10px; line-height:1.7; }
+.ab-detail summary{ cursor:pointer; font-weight:800; color:var(--secondary); }
+.ab-toggle{ display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; margin-bottom:8px; }
+.ab-toggle input{ transform:scale(1.1); }
+
+/* マイページ */
+.mp-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-2),var(--sh-inset); padding:16px; margin-bottom:14px; }
+.mp-top{ display:flex; align-items:center; gap:12px; }
+.mp-avatar{ font-size:40px; width:60px; height:60px; border-radius:50%; background:var(--surface-sub); display:flex; align-items:center; justify-content:center; }
+.mp-handle{ font-size:18px; font-weight:800; }
+.mp-title{ display:inline-block; font-size:11px; font-weight:800; color:#fff; background:var(--grad-quiz); border-radius:var(--r-pill); padding:3px 10px; margin-top:4px; }
+.mp-pts{ margin-left:auto; font-size:30px; color:var(--secondary); }
+.mp-pts small{ font-size:12px; color:var(--sub); margin-left:2px; }
+.mp-prog{ margin-top:13px; }
+.mp-prog-l{ font-size:11px; color:var(--sub); margin-bottom:5px; }
+.mp-prog-bar{ height:9px; background:var(--line); border-radius:999px; overflow:hidden; }
+.mp-prog-bar>i{ display:block; height:100%; background:var(--grad-primary); }
+.mp-switch{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:14px; margin-bottom:14px; }
+.mp-switch label{ font-size:13px; font-weight:800; display:block; margin-bottom:8px; }
+.mp-switch select{ width:100%; border:1.5px solid var(--line); border-radius:var(--r-sm); padding:11px; font-size:14px; background:var(--surface); color:var(--ink); margin-bottom:10px; }
+.mp-switch .btn{ margin-top:0; }
+.mp-note{ font-size:10.5px; color:var(--sub); margin-top:9px; line-height:1.6; }
+.mp-sec{ margin-bottom:8px; }
+.mp-sec .dash-h{ margin:6px 2px 10px; }
+
+/* =================== Step3: AIチャット検索 =================== */
+.ai-pill{ font-size:10px; font-weight:800; color:#fff; background:linear-gradient(135deg,#9b5de5,#ff5d8f); padding:2px 8px; border-radius:var(--r-pill); vertical-align:middle; margin-left:6px; -webkit-text-fill-color:#fff; }
+.ai-inputbar{ display:flex; gap:8px; margin:2px 0 14px; }
+.ai-inputbar input{ flex:1; min-width:0; border:1.5px solid var(--line); border-radius:var(--r-pill); padding:13px 16px; font-size:14px; font-family:inherit; background:var(--surface); color:var(--ink); }
+.ai-inputbar input:focus{ outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(255,106,43,.14); }
+.ai-send{ flex:0 0 auto; border:none; border-radius:var(--r-pill); padding:0 20px; font-size:14px; font-weight:800; color:#fff; background:var(--grad-primary); cursor:pointer; box-shadow:var(--sh-fab); }
+.ai-keybar{ display:flex; align-items:center; gap:8px; font-size:11.5px; line-height:1.5; color:var(--sub); background:var(--surface-sub); border:1px solid var(--line); border-radius:var(--r-md); padding:9px 12px; margin-bottom:12px; }
+.ai-keybar.ok{ color:#147a54; background:rgba(46,158,107,.1); border-color:rgba(46,158,107,.3); }
+.ai-keybar button{ margin-left:auto; flex:0 0 auto; border:none; background:var(--primary); color:#fff; border-radius:var(--r-pill); padding:6px 12px; font-size:11px; font-weight:800; cursor:pointer; }
+.ai-keybar.ok button{ background:var(--success); }
+.ai-cards{ margin-top:4px; }
+.ai-reason{ font-size:12px; font-weight:700; color:var(--secondary); margin:6px 2px 5px; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ===== ヘッダー（暖簾） ===== -->
+  <header class="noren" id="noren">
+    <div class="noren-in">
+      <span class="steam s1"></span><span class="steam s2"></span><span class="steam s3"></span>
+      <div>
+        <div class="logo">COCO<span class="dot">i</span>CO</div>
+        <div class="logo-sub">🍜 大学前のうまい店、見つけにいこ。</div>
+      </div>
+      <div class="h-right">
+        <button class="icon-btn tap" id="muteBtn" title="効果音" onclick="toggleMute()">🔊</button>
+        <div class="pts-pill"><span class="c">🪙</span><div><b class="num" id="ptDisplay">0</b><small>ココポイント</small></div></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ========== HOME ========== -->
+    <section id="home" class="active">
+      <div class="hero">
+        <div class="logo-big grad-text">COCOiCO</div>
+        <p class="copy">もう「何でもいい」とは、言わせない。</p>
+        <p class="greet" id="greet">はじめまして！今日の一軒、見つけにいこう。</p>
+      </div>
+
+      <div class="scoreboard" id="scoreboard">
+        <div class="medal" id="md-pt"><div class="mv num" id="sbPt">0</div><div class="ml">ココポイント</div><div class="floatp"></div></div>
+        <div class="medal" id="md-reg"><div class="mv num" id="sbReg">0</div><div class="ml">登録した店</div><div class="floatp"></div></div>
+        <div class="medal" id="md-quiz"><div class="mv num" id="sbQuiz">0</div><div class="ml">クイズ正解</div><div class="floatp"></div></div>
+        <div class="medal" id="md-rank"><div class="mv" id="sbRank" style="font-size:14px;padding:5px 0;">ー</div><div class="ml">称号</div></div>
+      </div>
+
+      <div class="modes" id="modeGrid">
+        <button class="mode m-strict tap" style="--d:0ms"   onclick="go('strict', this)">
+          <span class="me-emoji">🔥</span><span class="mname grad-text">厳選モード<span class="ai-pill">AI</span></span><span class="mdesc">AIに話しかけて<br>ぴったりの店を探す</span>
+        </button>
+        <button class="mode m-roulette tap" style="--d:70ms" onclick="go('roulette', this)">
+          <span class="me-emoji">🎯</span><span class="mname grad-text">探索モード</span><span class="mdesc">未知の名店を開拓！<br>ルーレットでお告げ</span>
+        </button>
+        <button class="mode m-quiz tap" style="--d:140ms" onclick="go('quiz', this)">
+          <span class="me-emoji">🧠</span><span class="mname grad-text">ご飯屋クイズ</span><span class="mdesc">解いて〇〇マスターに<br>新しい店とも出会える</span>
+        </button>
+        <button class="mode m-cafe tap" style="--d:210ms" onclick="go('cafe', this)">
+          <span class="me-emoji">☕</span><span class="mname grad-text">隠れ家喫茶店</span><span class="mdesc">地図に載らない名店<br>読書・長居OKを厳選</span>
+        </button>
+      </div>
+
+      <div class="cta-row">
+        <button class="btn-discover tap" onclick="go('register', this)"><span class="me-emoji" style="font-size:22px;filter:none;">✨</span> 知らない店を登録して、褒められる</button>
+      </div>
+
+    </section>
+
+    <!-- ========== STRICT (Step3: AIチャット曖昧検索) ========== -->
+    <section id="strict">
+      <h2 class="title"><span class="te" id="te-strict">🔥</span>厳選モード<span class="ai-pill">AI検索</span></h2>
+      <p class="lead">行きたいお店のイメージを、そのまま言葉で話しかけて。AIココ助があなたにぴったりの一軒を探します。</p>
+      <div class="ai-inputbar">
+        <input id="aiInput" type="text" placeholder="例）彼女と記念日。3000円くらいで静かな和食" onkeydown="if(event.key==='Enter')aiSend()">
+        <button class="ai-send tap" onclick="aiSend()">探す</button>
+      </div>
+      <div id="chatLog"></div>
+      <div class="simmer" id="simmer" style="display:none"></div>
+      <div id="chatChoices"></div>
+      <div id="chatResult"></div>
+      <button class="btn ghost sm tap" onclick="startChat()" style="margin-top:10px;">🧩 条件を選んで探す（質問形式）</button>
+    </section>
+
+    <!-- ========== ROULETTE ========== -->
+    <section id="roulette">
+      <h2 class="title"><span class="te" id="te-roulette">🎯</span>探索モード</h2>
+      <p class="lead">「ちょっと知らない店、開拓しよ」な気分に。鉄板ターンテーブルを回して、未知の名店に出会おう。</p>
+      <div class="card">
+        <div class="qlabel">どんな冒険にする？</div>
+        <div class="scope" id="rouletteScope">
+          <div class="chip sel tap" data-r="all">🎆 全部</div>
+          <div class="chip tap" data-r="中堅">🏮 中堅</div>
+          <div class="chip tap" data-r="秘境">🌿 秘境</div>
+        </div>
+        <div class="wheelwrap">
+          <div class="pointer">🔻</div>
+          <canvas id="wheel" width="300" height="300"></canvas>
+          <div class="hub">🍽️</div>
+        </div>
+        <button class="spin-cta tap" id="spinBtn" onclick="spin()">🎲 ルーレットを回す！</button>
+      </div>
+      <div id="rouletteResult"></div>
+    </section>
+
+    <!-- ========== REGISTER ========== -->
+    <section id="register">
+      <h2 class="title"><span class="te" id="te-register">✨</span>オススメの店を登録</h2>
+      <p class="lead">あなたの「実際に行ってよかった店」を登録しよう。誰もまだ知らない店なら…サプライズがあるかも？</p>
+      <div class="card">
+        <div class="field"><label>店名 <span style="color:var(--secondary)">*</span></label>
+          <input id="regName" type="text" placeholder="例）まかない食堂 こめ太郎" maxlength="40"></div>
+        <div class="field"><label>ジャンル / 気分</label><div class="chips" id="regMood"></div></div>
+        <div class="field"><label>大学からの距離（徒歩）</label>
+          <select id="regDist">
+            <option value="2">徒歩2分（目の前）</option><option value="5" selected>徒歩5分</option>
+            <option value="8">徒歩8分</option><option value="12">徒歩12分</option><option value="18">徒歩18分（ちょい遠征）</option>
+          </select></div>
+        <div class="field"><label>予算の目安</label><div class="chips" id="regPrice"></div></div>
+        <div class="field"><label>ニッチ度（知名度）</label><div class="chips" id="regNiche"></div></div>
+        <div class="field"><label>おすすめポイント <span style="color:var(--secondary)">*</span></label>
+          <textarea id="regPoint" placeholder="例）夜だけ出る裏メニューの油そばが神。学割で大盛り無料！" maxlength="120"></textarea></div>
+        <label class="checkrow"><input id="regCafe" type="checkbox"> 隠れ家喫茶店として登録する</label>
+        <button class="btn tap" onclick="submitRegister()">🚀 この店を登録する</button>
+      </div>
+    </section>
+
+    <!-- ========== QUIZ ========== -->
+    <section id="quiz">
+      <h2 class="title"><span class="te" id="te-quiz">🧠</span>町のご飯屋クイズ</h2>
+      <div class="titlebar">
+        <span class="crown">👑</span>
+        <div><b id="quizTitle">グルメ見習い</b><small><span class="num" id="quizCorrect">0</span>問正解 / 称号まであと<span class="num" id="quizNext">3</span>問</small></div>
+        <div class="combo"><div class="cv num score-skew" id="comboV">0</div><div class="cl">🔥COMBO</div></div>
+      </div>
+      <div class="card qcard" id="quizCard"></div>
+    </section>
+
+    <!-- ========== CAFE ========== -->
+    <section id="cafe">
+      <h2 class="title"><span class="te" id="te-cafe">☕</span>隠れ家喫茶店リスト</h2>
+      <div class="cafe-hd"><span class="cs"></span>
+        <h3>地図に載らない、知る人ぞ知る空間。</h3>
+        <p>静かに本と向き合いたい大学生のための専用ページ。タグで“今の気分”に合う一席を。</p>
+      </div>
+      <div class="qlabel" style="margin-left:2px;">タグでしぼり込む（複数OK）</div>
+      <div class="seg" id="cafeTags"></div>
+      <div id="cafeList"></div>
+    </section>
+
+    <!-- ========== DASHBOARD (Step2 機能2/3/5) ========== -->
+    <section id="dashboard">
+      <h2 class="title"><span class="te" id="te-dashboard">🏆</span>みんなの人気店</h2>
+      <p class="lead">大学生のみんなが実際に選んでいる、いま人気のお店ランキングです。気になる一軒を見つけよう。</p>
+      <div id="dashBody"></div>
+    </section>
+
+    <!-- ========== MYPAGE (Step2 機能6) ========== -->
+    <section id="mypage">
+      <h2 class="title"><span class="te" id="te-mypage">👤</span>マイページ</h2>
+      <p class="lead">あなたのプロフィール・お気に入り・登録した店。プロフィールを切り替えると、ランキングや共起が“その人視点”になります。</p>
+      <div id="mypageBody"></div>
+    </section>
+  </main>
+
+  <!-- ===== 下部ナビ ===== -->
+  <nav class="dock dock7">
+    <button class="navb on tap" data-nav="home" onclick="go('home')"><span class="ni">🏠</span>ホーム</button>
+    <button class="navb tap" data-nav="strict" onclick="go('strict')"><span class="ni">🔥</span>厳選</button>
+    <button class="navb tap" data-nav="roulette" onclick="go('roulette')"><span class="ni">🎯</span>探索</button>
+    <div class="fab-wrap"><button class="fab tap" onclick="go('register', this)"><span class="fi">＋</span><span class="fl">登録</span></button></div>
+    <button class="navb tap" data-nav="cafe" onclick="go('cafe')"><span class="ni">☕</span>喫茶</button>
+    <button class="navb tap" data-nav="dashboard" onclick="go('dashboard')"><span class="ni">🏆</span>人気</button>
+    <button class="navb tap" data-nav="mypage" onclick="go('mypage')"><span class="ni">👤</span>マイ</button>
+  </nav>
+</div>
+
+<!-- ===== オーバーレイ群 ===== -->
+<div id="toast"></div>
+<canvas id="fxCanvas"></canvas>
+<div id="wipe"></div>
+<div id="flyer"></div>
+<div id="modalLayer"><div class="praise" id="praiseBox"></div></div>
+<div id="splash">
+  <span class="sp-steam" style="left:42%"></span><span class="sp-steam" style="left:54%;animation-delay:1.4s"></span>
+  <div class="sp-logo">COCOiCO</div>
+  <div class="sp-sub">今日どこ行く？を、ごちそうに。</div>
+</div>
+
+<script>
+/* =========================================================
+   COCOiCO — データ層（機能ロジックは見た目から分離）
+   ========================================================= */
+const OPT = {
+  people:["1人","2人","3〜4人","5人以上"],
+  companion:["ひとりで","仲のいい友達","友達","恋人","気になる人","先輩","後輩","サークル・ゼミ仲間"],
+  time:["モーニング","ランチ","カフェタイム","ディナー","深夜","終電逃し後"],
+  price:["1000円未満","1000〜2000円","2000〜3000円","3000〜5000円","5000円以上"],
+  reserve:["予約必須","予約可能","予約してもしなくてもいい","予約不可"],
+  smoke:["禁煙","喫煙"],
+  mood:["和食","洋食","中華","アジア系","その他海外料理","がっつり・こってり","あっさり・ヘルシー","軽食・甘いもの"],
+  niche:["定番","中堅","秘境"],
+  yum:["圧倒的美味","コスパ重視","中毒性あり"],
+  owner:["フレンドリー","適度な距離感","完全無干渉"],
+  atmos:["ワイワイ・ガヤガヤ","おしゃれ・洗練","静か・落ち着き","ディープ・レトロ"],
+  break:["昼休み","空きコマ","放課後・全休"]
+};
+const SEED = [
+  {emoji:"🍜",name:"まかない食堂 こめ太郎",mood:["和食","がっつり・こってり"],dist:3,price:"1000円未満",reserve:"予約不可",smoke:"完全禁煙",niche:"定番",yum:["コスパ重視","中毒性あり"],owner:"フレンドリー",atmos:["ワイワイ・ガヤガヤ"],people:["1人","2人","3〜4人"],companion:["ひとりで","仲のいい友達","後輩"],time:["ランチ","ディナー"],brk:["昼休み","空きコマ"],point:"学割で大盛り無料。チキン南蛮定食が500円台という大学生の聖地。とにかく腹を満たしたい日に。"},
+  {emoji:"🍝",name:"トラットリア・ボーノ",mood:["洋食","西洋系"],dist:7,price:"2000〜3000円",reserve:"予約可能",smoke:"完全禁煙",niche:"中堅",yum:["圧倒的美味"],owner:"適度な距離感",atmos:["おしゃれ・洗練"],people:["2人"],companion:["恋人","気になる人"],time:["ディナー"],brk:["放課後・全休"],point:"間接照明の効いた隠れ家イタリアン。デートで失敗したくない夜に。自家製生パスタが評判。"},
+  {emoji:"🥟",name:"町中華 龍王軒",mood:["中華","がっつり・こってり"],dist:5,price:"1000〜2000円",reserve:"予約不可",smoke:"分煙",niche:"定番",yum:["コスパ重視","中毒性あり"],owner:"フレンドリー",atmos:["ディープ・レトロ"],people:["1人","2人","3〜4人"],companion:["仲のいい友達","先輩"],time:["ランチ","ディナー","深夜"],brk:["昼休み","放課後・全休"],point:"昭和から続く町中華。半チャンラーメンの破壊力。深夜まで開いてて飲んだ後の〆にも最強。"},
+  {emoji:"🍢",name:"おでん横丁 だしの",mood:["和食","あっさり・ヘルシー"],dist:9,price:"2000〜3000円",reserve:"予約可能",smoke:"喫煙より",niche:"秘境",yum:["圧倒的美味"],owner:"フレンドリー",atmos:["ディープ・レトロ"],people:["2人","3〜4人"],companion:["先輩","友達"],time:["ディナー","深夜"],brk:["放課後・全休"],point:"路地裏の知る人ぞ知るおでん屋。大将の人柄に常連が集う。先輩に連れてってもらった感を演出できる。"},
+  {emoji:"🍛",name:"スパイス研究室 マサラ",mood:["アジア系","あっさり・ヘルシー"],dist:6,price:"1000〜2000円",reserve:"予約してもしなくてもいい",smoke:"完全禁煙",niche:"中堅",yum:["中毒性あり"],owner:"適度な距離感",atmos:["おしゃれ・洗練"],people:["1人","2人"],companion:["ひとりで","仲のいい友達"],time:["ランチ","ディナー"],brk:["昼休み","空きコマ"],point:"週替わりの本格スパイスカレー。ひとりランチでも居心地◎。汗かいて午後の授業をリセット。"},
+  {emoji:"🍖",name:"七輪焼肉 もくもく亭",mood:["和食","がっつり・こってり"],dist:11,price:"3000〜5000円",reserve:"予約必須",smoke:"分煙",niche:"中堅",yum:["圧倒的美味"],owner:"フレンドリー",atmos:["ワイワイ・ガヤガヤ"],people:["3〜4人","5人以上"],companion:["サークル・ゼミ仲間","仲のいい友達"],time:["ディナー"],brk:["放課後・全休"],point:"打ち上げの王道。コスパのいい食べ放題コースあり。大人数で予約して盛り上がるならここ。"},
+  {emoji:"🍣",name:"立ち寿司 まわらない",mood:["和食"],dist:8,price:"3000〜5000円",reserve:"予約可能",smoke:"完全禁煙",niche:"秘境",yum:["圧倒的美味"],owner:"適度な距離感",atmos:["静か・落ち着き"],people:["1人","2人"],companion:["恋人","先輩"],time:["ディナー"],brk:["放課後・全休"],point:"カウンター7席だけの立ち寿司。学生には背伸びだけど、ここぞの日に。ネタの鮮度がガチ。"},
+  {emoji:"🍔",name:"バーガースタンド GABU",mood:["洋食","がっつり・こってり"],dist:4,price:"1000〜2000円",reserve:"予約不可",smoke:"完全禁煙",niche:"中堅",yum:["中毒性あり","コスパ重視"],owner:"フレンドリー",atmos:["おしゃれ・洗練"],people:["1人","2人","3〜4人"],companion:["仲のいい友達","気になる人"],time:["ランチ","カフェタイム","ディナー"],brk:["昼休み","空きコマ"],point:"肉汁あふれるクラフトバーガー。テイクアウトして空きコマにキャンパスのベンチで食べるのが通。"},
+  {emoji:"🍲",name:"ひとり鍋 ぽかぽか亭",mood:["和食","あっさり・ヘルシー"],dist:10,price:"1000〜2000円",reserve:"予約してもしなくてもいい",smoke:"完全禁煙",niche:"秘境",yum:["中毒性あり"],owner:"完全無干渉",atmos:["静か・落ち着き"],people:["1人","2人"],companion:["ひとりで"],time:["ランチ","ディナー","深夜"],brk:["空きコマ","放課後・全休"],point:"一人用の小鍋がウリ。誰にも干渉されず黙々と食べたい日に。野菜たっぷりで罪悪感ゼロ。"},
+  {emoji:"🌮",name:"タコス酒場 アミーゴ",mood:["その他海外料理","がっつり・こってり"],dist:13,price:"2000〜3000円",reserve:"予約可能",smoke:"喫煙より",niche:"秘境",yum:["中毒性あり"],owner:"フレンドリー",atmos:["ワイワイ・ガヤガヤ"],people:["3〜4人","5人以上"],companion:["仲のいい友達","サークル・ゼミ仲間"],time:["ディナー","深夜","終電逃し後"],brk:["放課後・全休"],point:"陽気なメキシカン。終電逃した時の避難所。ノリで盛り上がりたいサークルの二次会に。"},
+  {emoji:"🍤",name:"天ぷら定食 さくさく庵",mood:["和食","がっつり・こってり"],dist:6,price:"1000〜2000円",reserve:"予約不可",smoke:"完全禁煙",niche:"定番",yum:["コスパ重視"],owner:"適度な距離感",atmos:["静か・落ち着き"],people:["1人","2人"],companion:["ひとりで","先輩","後輩"],time:["ランチ"],brk:["昼休み"],point:"揚げたて天丼が安い。回転が早いから昼休みのサクッと飯に最適。先輩との昼ごはんにも無難。"},
+  {emoji:"🍛",name:"欧風カレー 琥珀",mood:["洋食","がっつり・こってり"],dist:7,price:"1000〜2000円",reserve:"予約してもしなくてもいい",smoke:"完全禁煙",niche:"中堅",yum:["圧倒的美味","中毒性あり"],owner:"完全無干渉",atmos:["静か・落ち着き"],people:["1人","2人"],companion:["ひとりで","気になる人"],time:["ランチ","カフェタイム","ディナー"],brk:["空きコマ"],point:"2日煮込んだ濃厚ルー。BGMはジャズ、静かに過ごせる。読書しながらのひとり飯にもうってつけ。"},
+  {emoji:"🥘",name:"スンドゥブ専門 火花",mood:["アジア系","がっつり・こってり"],dist:5,price:"1000〜2000円",reserve:"予約不可",smoke:"完全禁煙",niche:"定番",yum:["中毒性あり","コスパ重視"],owner:"フレンドリー",atmos:["ワイワイ・ガヤガヤ"],people:["1人","2人","3〜4人"],companion:["仲のいい友達","後輩"],time:["ランチ","ディナー"],brk:["昼休み","放課後・全休"],point:"辛さ7段階のスンドゥブ。汗だくになりながら友達と挑戦するのが楽しい。ごはんおかわり自由。"},
+  {emoji:"🧆",name:"ケバブ屋台 イスタン",mood:["その他海外料理","がっつり・こってり"],dist:2,price:"1000円未満",reserve:"予約不可",smoke:"完全禁煙",niche:"中堅",yum:["コスパ重視","中毒性あり"],owner:"フレンドリー",atmos:["ワイワイ・ガヤガヤ"],people:["1人","2人"],companion:["ひとりで","仲のいい友達"],time:["ランチ","カフェタイム","深夜"],brk:["昼休み","空きコマ","放課後・全休"],point:"大学門前の屋台。500円でボリューム満点のケバブサンド。歩きながら食べられて空きコマの味方。"},
+  {emoji:"🍰",name:"純喫茶 ことり",mood:["軽食・甘いもの"],dist:8,price:"1000〜2000円",reserve:"予約不可",smoke:"完全禁煙",niche:"秘境",yum:["圧倒的美味"],owner:"完全無干渉",atmos:["静か・落ち着き","ディープ・レトロ"],people:["1人","2人"],companion:["ひとりで","気になる人"],time:["モーニング","カフェタイム"],brk:["空きコマ","放課後・全休"],point:"昭和レトロな純喫茶。分厚いホットケーキと深煎り珈琲。長居しても怒られない。",cafe:true,cafeTags:["読書向き","完全禁煙","長居しやすい","静か","レトロ"]},
+  {emoji:"📚",name:"本と珈琲 余白",mood:["軽食・甘いもの"],dist:12,price:"1000〜2000円",reserve:"予約不可",smoke:"完全禁煙",niche:"秘境",yum:["圧倒的美味"],owner:"完全無干渉",atmos:["静か・落ち着き"],people:["1人"],companion:["ひとりで"],time:["モーニング","カフェタイム"],brk:["空きコマ","放課後・全休"],point:"壁一面が本棚のブックカフェ。私語厳禁の集中席あり。レポートが捗りすぎる隠れ家。",cafe:true,cafeTags:["読書向き","完全禁煙","長居しやすい","静か","電源あり","Wi-Fi"]},
+  {emoji:"☕",name:"喫茶 こもれび",mood:["軽食・甘いもの"],dist:15,price:"1000〜2000円",reserve:"予約不可",smoke:"完全禁煙",niche:"秘境",yum:["中毒性あり"],owner:"フレンドリー",atmos:["静か・落ち着き","ディープ・レトロ"],people:["1人","2人"],companion:["ひとりで","友達"],time:["モーニング","カフェタイム","ランチ"],brk:["放課後・全休"],point:"古民家を改装した一軒家カフェ。庭を眺めながらの自家製プリンが絶品。時間がゆっくり流れる。",cafe:true,cafeTags:["読書向き","完全禁煙","長居しやすい","Wi-Fi"]},
+  {emoji:"🫖",name:"日本茶スタンド 一服",mood:["軽食・甘いもの","あっさり・ヘルシー"],dist:6,price:"1000円未満",reserve:"予約不可",smoke:"完全禁煙",niche:"中堅",yum:["圧倒的美味"],owner:"適度な距離感",atmos:["おしゃれ・洗練","静か・落ち着き"],people:["1人","2人"],companion:["ひとりで","気になる人"],time:["カフェタイム","空きコマ"],brk:["空きコマ"],point:"こだわりの日本茶と和菓子のスタンド。コンパクトだけど落ち着く。授業の合間のリセットに。",cafe:true,cafeTags:["完全禁煙","静か","電源あり"]}
+];
+const QUIZ = [
+  {q:"「半チャンラーメン」が名物の、昭和から続く大学前の町中華はどこ？",opts:["町中華 龍王軒","トラットリア・ボーノ","本と珈琲 余白"],a:0,exp:"正解は町中華 龍王軒！半チャンラーメンの破壊力に加え、深夜まで営業しているので飲んだ後の〆にも最強です。",link:"町中華 龍王軒"},
+  {q:"打ち上げで大人数の食べ放題に行くならどの店が定番？",opts:["純喫茶 ことり","七輪焼肉 もくもく亭","ひとり鍋 ぽかぽか亭"],a:1,exp:"正解は七輪焼肉 もくもく亭！コスパのいい食べ放題コースがあり、サークルの打ち上げの王道です。予約必須なのでお早めに。",link:"七輪焼肉 もくもく亭"},
+  {q:"壁一面が本棚で、私語厳禁の集中席があるブックカフェは？",opts:["バーガースタンド GABU","本と珈琲 余白","タコス酒場 アミーゴ"],a:1,exp:"正解は本と珈琲 余白！電源・Wi-Fi完備でレポートが捗りすぎる隠れ家。地図には載りにくい秘境カフェです。",link:"本と珈琲 余白"},
+  {q:"大学の門前にあり、500円でボリューム満点。歩きながら食べられる屋台は？",opts:["ケバブ屋台 イスタン","立ち寿司 まわらない","欧風カレー 琥珀"],a:0,exp:"正解はケバブ屋台 イスタン！徒歩2分の門前屋台で、空きコマのおやつ感覚にぴったりです。",link:"ケバブ屋台 イスタン"},
+  {q:"終電を逃した夜に、陽気に盛り上がれる避難所メキシカンは？",opts:["天ぷら定食 さくさく庵","タコス酒場 アミーゴ","日本茶スタンド 一服"],a:1,exp:"正解はタコス酒場 アミーゴ！深夜〜終電逃し後まで開いていて、サークルの二次会にも◎。",link:"タコス酒場 アミーゴ"},
+  {q:"汗だくになりながら友達と挑戦したい、辛さ7段階の専門店は？",opts:["スンドゥブ専門 火花","おでん横丁 だしの","喫茶 こもれび"],a:0,exp:"正解はスンドゥブ専門 火花！ごはんおかわり自由で、友達とワイワイ辛さに挑戦するのが楽しい店です。",link:"スンドゥブ専門 火花"},
+];
+const TITLES=[{n:0,t:"グルメ見習い"},{n:3,t:"街グルメ初段"},{n:6,t:"食通アンバサダー"},{n:10,t:"街グルメマスター"},{n:15,t:"伝説のグルメ仙人"}];
+
+/* =========================================================
+   Step2: 自前リレーショナルDB層 (LocalDB / localStorage 土台)
+   ========================================================= */
+const DB_NS='cocoico_v2';
+const BASE_TS=1714521600000;          // 2024-05-01 固定基準
+const RNG_SEED=20240601;
+const B_REG=50, B_SPIN=2;             // 擬似userのポイント寄与（新規登録/スピン）
+const SCHEMA={
+  users:{pk:'id', prefix:'u', indexes:['handle','is_seed'], unique:['handle']},
+  restaurants:{pk:'id', prefix:'r', indexes:['niche','cafe','created_by','is_seed'], unique:['name']},
+  favorites:{pk:'id', prefix:'f', indexes:['user_id','restaurant_id'], unique:['user_id|restaurant_id']},
+  quiz_questions:{pk:'id', prefix:'q', indexes:[], unique:[]},
+  quiz_attempts:{pk:'id', prefix:'qa', indexes:['user_id','question_id','is_correct'], unique:[]},
+  roulette_spins:{pk:'id', prefix:'sp', indexes:['user_id','restaurant_id'], unique:[]},
+  ab_events:{pk:'id', prefix:'ab', indexes:['ab_group','event_type','user_id'], unique:[]},
+  meta:{pk:'k', prefix:'m', indexes:[], unique:[]}
+};
+class LocalDB{
+  constructor(schema){ this.schema=schema; this.cache={}; for(const t in schema) this._load(t); }
+  _key(t){ return DB_NS+':'+t; }
+  _load(t){
+    let data={rows:[],auto:0};
+    try{ const raw=localStorage.getItem(this._key(t)); if(raw){ const p=JSON.parse(raw); if(p&&Array.isArray(p.rows)) data={rows:p.rows,auto:p.auto||0}; } }catch(e){}
+    this.cache[t]={rows:data.rows, auto:data.auto, pk:new Map()};
+    this._reindex(t);
+  }
+  _reindex(t){ const pk=this.schema[t].pk; const m=this.cache[t].pk; m.clear(); for(const r of this.cache[t].rows) m.set(r[pk], r); }
+  _persist(t){ try{ localStorage.setItem(this._key(t), JSON.stringify({rows:this.cache[t].rows, auto:this.cache[t].auto})); }catch(e){ console.warn('persist',t,e); } }
+  gen(t){ const c=this.cache[t]; return (this.schema[t].prefix||t[0])+'_'+Date.now().toString(36)+'_'+(c.auto++).toString(36); }
+  _checkUnique(t,row){
+    const pk=this.schema[t].pk;
+    for(const u of (this.schema[t].unique||[])){
+      const cols=u.split('|'); const key=cols.map(c=>row[c]).join('');
+      for(const r of this.cache[t].rows){ if(r[pk]===row[pk]) continue; if(cols.map(c=>r[c]).join('')===key) throw new Error('UNIQUE '+t+'.'+u); }
+    }
+  }
+  insert(t,obj){ const pk=this.schema[t].pk; const row=Object.assign({},obj); if(row[pk]==null) row[pk]=this.gen(t);
+    this._checkUnique(t,row); this.cache[t].rows.push(row); this.cache[t].pk.set(row[pk],row); this._persist(t); return row; }
+  bulkInsert(t,arr){ const pk=this.schema[t].pk; for(const o of arr){ const row=Object.assign({},o); if(row[pk]==null) row[pk]=this.gen(t); this._checkUnique(t,row); this.cache[t].rows.push(row); this.cache[t].pk.set(row[pk],row); } this._persist(t); }
+  get(t,id){ return this.cache[t].pk.get(id)||null; }
+  all(t){ return this.cache[t].rows.slice(); }
+  _match(r,cond){ if(typeof cond==='function') return cond(r); for(const k in cond){ if(r[k]!==cond[k]) return false; } return true; }
+  where(t,cond){ if(cond==null) return this.all(t); return this.cache[t].rows.filter(r=>this._match(r,cond)); }
+  first(t,cond){ return this.cache[t].rows.find(r=>this._match(r,cond))||null; }
+  count(t,cond){ if(cond==null) return this.cache[t].rows.length; let n=0; for(const r of this.cache[t].rows) if(this._match(r,cond)) n++; return n; }
+  update(t,id,patch){ const r=this.get(t,id); if(!r) return null; Object.assign(r,patch); this._persist(t); return r; }
+  remove(t,cond){ const n=this.cache[t].rows.length; this.cache[t].rows=this.cache[t].rows.filter(r=>!this._match(r,cond)); if(this.cache[t].rows.length!==n){ this._reindex(t); this._persist(t); } }
+  countBy(rows,keyFn){ const m=new Map(); for(const r of rows){ const k=keyFn(r); m.set(k,(m.get(k)||0)+1); } return m; }
+}
+const db = new LocalDB(SCHEMA);
+
+/* ---------- 種付き乱数 (mulberry32, 決定論) ---------- */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+let RNG=mulberry32(RNG_SEED);
+function rnd(){ return RNG(); }
+function randInt(a,b){ return a+Math.floor(rnd()*(b-a+1)); }   // [a,b] inclusive
+function pick(arr){ return arr[Math.floor(rnd()*arr.length)]; }
+function weightedPick(items,weights){ let tot=weights.reduce((s,w)=>s+w,0), x=rnd()*tot; for(let i=0;i<items.length;i++){ x-=weights[i]; if(x<=0) return items[i]; } return items[items.length-1]; }
+
+/* ---------- 統計ヘルパ (自前実装・ライブラリ不可) ---------- */
+const stats={
+  mean(a){ return a.length? a.reduce((s,x)=>s+x,0)/a.length : 0; },
+  median(a){ if(!a.length) return 0; const s=a.slice().sort((x,y)=>x-y); const n=s.length,m=n>>1; return n%2? s[m] : (s[m-1]+s[m])/2; },
+  variance(a,sample){ const n=a.length; if(n===0||(sample&&n<2)) return 0; const mu=stats.mean(a); const ss=a.reduce((s,x)=>s+(x-mu)*(x-mu),0); return ss/(sample? n-1 : n); },
+  std(a,sample){ return Math.sqrt(stats.variance(a,sample)); },
+  jaccard(A,B){ if(A.size===0&&B.size===0) return 0; const s=A.size<B.size?A:B, l=A.size<B.size?B:A; let inter=0; s.forEach(x=>{ if(l.has(x)) inter++; }); const uni=A.size+B.size-inter; return uni===0?0:inter/uni; },
+  normCdf(z){ const t=1/(1+0.2316419*Math.abs(z)); const d=0.3989422804014327*Math.exp(-z*z/2); let p=d*t*(0.319381530+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429)))); p=1-p; return z>=0? p : 1-p; },
+  twoPropZ(x1,n1,x2,n2){ const p1=n1?x1/n1:0, p2=n2?x2/n2:0; const pPool=(n1+n2)?(x1+x2)/(n1+n2):0; const se=Math.sqrt(pPool*(1-pPool)*(1/n1+1/n2)); const z=se>0?(p1-p2)/se:0; return {p1,p2,pPool,se,z}; },
+  diffCI(x1,n1,x2,n2,zc){ zc=zc||1.96; const p1=n1?x1/n1:0, p2=n2?x2/n2:0; const se=Math.sqrt(p1*(1-p1)/n1+p2*(1-p2)/n2); const diff=p1-p2; return {diff, lo:diff-zc*se, hi:diff+zc*se, se}; }
+};
+
+/* ---------- 数学ユーティリティ（機能3/6） ---------- */
+function pointsFor(p){ if(p==null) return 15; return Math.max(5, Math.min(30, Math.round(5+25*(1-p)))); }
+function expectedPt(p,pts){ return Math.round((p||0)*pts*100)/100; }
+function titleFor(c){ let t=TITLES[0].t; for(const x of TITLES){ if(c>=x.n) t=x.t; } return t; }
+function pad2(n){ return (n<10?'0':'')+n; }
+
+/* ---------- 認証/現在ユーザー ---------- */
+function metaGet(k){ const m=db.get('meta',k); return m? m.v : null; }
+function metaSet(k,v){ if(db.get('meta',k)) db.update('meta',k,{v:v}); else db.insert('meta',{k:k,v:v}); }
+function currentUserId(){ return metaGet('current_user_id'); }
+function getCurrentUser(){ const id=currentUserId(); return id? db.get('users',id) : null; }
+function addPoints(uid,delta){ const u=db.get('users',uid); if(u) db.update('users',uid,{points:(u.points||0)+delta}); }
+function syncTitle(uid){ const qc=db.count('quiz_attempts',{user_id:uid,is_correct:1}); db.update('users',uid,{quiz_correct:qc, title:titleFor(qc)}); }
+
+/* ---------- Step1互換ブリッジ: store / save / allRestos ---------- */
+const store={
+  get points(){ const u=getCurrentUser(); return u? (u.points||0):0; },
+  set points(v){ const u=getCurrentUser(); if(u) db.update('users',u.id,{points:v}); },
+  get quizCorrect(){ const u=getCurrentUser(); return u? (u.quiz_correct||0):0; },
+  set quizCorrect(v){ const u=getCurrentUser(); if(u) db.update('users',u.id,{quiz_correct:v}); },
+  get registered(){ const u=getCurrentUser(); return u? db.where('restaurants',{created_by:u.id}):[]; },
+  get favs(){ const u=getCurrentUser(); if(!u) return []; return db.where('favorites',{user_id:u.id}).map(f=>{ const r=db.get('restaurants',f.restaurant_id); return r?r.name:null; }).filter(Boolean); },
+  quizSeen:[], visited:true
+};
+function save(){ /* DBが自己永続化するため no-op（Step1互換） */ }
+function allRestos(){ return db.all('restaurants'); }
+let muted = localStorage.getItem('cocoico_muted')==='1';
+
+/* ---------- SEED→DB 投入 & 擬似コミュニティ生成（決定論・冪等） ---------- */
+function toRestaurantRow(s,i){
+  return { id:'r_seed_'+pad2(i), name:s.name, emoji:s.emoji, mood:s.mood||[], dist:s.dist, price:s.price,
+    reserve:s.reserve, smoke:s.smoke, niche:s.niche, yum:s.yum||[], owner:s.owner, atmos:s.atmos||[],
+    people:s.people||[], companion:s.companion||[], time:s.time||[], brk:s.brk||[], point:s.point,
+    cafe: s.cafe?1:0, cafe_tags:s.cafeTags||[], created_by:'seed_system', is_seed:1, created_at:BASE_TS+i*1000 };
+}
+function nameToIdMap(){ const m={}; for(const r of db.all('restaurants')) m[r.name]=r.id; return m; }
+function quizStats(qid){ const n=db.count('quiz_attempts',{question_id:qid}); const c=db.count('quiz_attempts',{question_id:qid,is_correct:1}); return {n, correct:c, p:n>0? c/n : null}; }
+function seedCommunity(){
+  RNG=mulberry32(RNG_SEED);                         // 生成順を固定して再現性確保
+  // (1) 店舗18
+  db.bulkInsert('restaurants', SEED.map(toRestaurantRow));
+  const N2I=nameToIdMap();
+  // (2) クイズ6問
+  db.bulkInsert('quiz_questions', QUIZ.map((q,i)=>({ id:'q_'+pad2(i), q:q.q, opts:q.opts, answer_index:q.a, exp:q.exp, answer_restaurant_id:N2I[q.link]||null, base_points:10 })));
+  // (3) 擬似ユーザー40
+  const ADJ=['腹ペコ','街歩き','深夜の','コスパ','放課後','ひとり','研究熱心な','食いしん坊','カフェ好き','早起き','辛党','甘党','探検','常連','新入生','放浪','学食卒業','終電逃し'];
+  const NOUN=['大学生','グルメ','探検家','部長','ラーメン党','読書家','美食家','院生','サークル長','一年生','研究者','食通'];
+  const AV=['🍙','🍜','🍰','🍛','☕','🍣','🍖','🍔','🍲','🥟','🌮','🧆','🫖','📚','🥘','🍝','🍢','🍤','🧑‍🎓','😋'];
+  const ids=Object.values(N2I);
+  const C1=['七輪焼肉 もくもく亭','町中華 龍王軒','スンドゥブ専門 火花','ケバブ屋台 イスタン','タコス酒場 アミーゴ','まかない食堂 こめ太郎'].map(n=>N2I[n]);
+  const C2=['純喫茶 ことり','本と珈琲 余白','喫茶 こもれび','日本茶スタンド 一服','欧風カレー 琥珀','ひとり鍋 ぽかぽか亭'].map(n=>N2I[n]);
+  const C3=['トラットリア・ボーノ','立ち寿司 まわらない','バーガースタンド GABU','スパイス研究室 マサラ','天ぷら定食 さくさく庵','おでん横丁 だしの'].map(n=>N2I[n]);
+  const clusters=[C1,C2,C3];
+  const standards=db.where('restaurants',{niche:'定番'}).map(r=>r.id);     // 定番に追加ウェイト
+  const used=new Set();
+  const seedUsers=[];
+  for(let i=0;i<40;i++){
+    let h=pick(ADJ)+pick(NOUN); if(used.has(h)) h=h+pad2(i); used.add(h);
+    const grp=rnd()<0.5?'A':'B';
+    const u=db.insert('users',{handle:h, avatar:pick(AV), points:0, quiz_correct:0, title:'グルメ見習い', ab_group:grp, is_seed:1, created_at:BASE_TS-randInt(0,30)*86400000, last_active_at:BASE_TS-randInt(0,7)*86400000});
+    const cl=clusters[randInt(0,2)];
+    seedUsers.push({u, cl});
+  }
+  // (4) お気に入り（3嗜好クラスタ＋定番ウェイト）
+  for(const su of seedUsers){
+    const k=randInt(2,7); const chosen=new Set();
+    for(let j=0;j<k*3 && chosen.size<k;j++){
+      let rid = rnd()<0.7? pick(su.cl) : pick(ids);
+      if(rnd()<0.25) rid=pick(standards);              // 定番に寄せる
+      if(chosen.has(rid)) continue; chosen.add(rid);
+    }
+    chosen.forEach(rid=>{ try{ db.insert('favorites',{user_id:su.u.id, restaurant_id:rid, created_at:BASE_TS-randInt(0,20)*86400000}); }catch(e){} });
+  }
+  // (5) クイズ挑戦（問別 pTrue・期待値配点で当時awarded格納）
+  const pTrue=[0.85,0.7,0.45,0.6,0.55,0.35];
+  for(const su of seedUsers){
+    for(let qi=0; qi<6; qi++){
+      if(rnd()<0.25) continue;                          // 一部の問は未挑戦（挑戦数に差）
+      const ok = rnd()<pTrue[qi] ? 1 : 0;
+      const awarded = ok? pointsFor(pTrue[qi]) : 0;
+      db.insert('quiz_attempts',{user_id:su.u.id, question_id:'q_'+pad2(qi), chosen_index: ok?QUIZ[qi].a:((QUIZ[qi].a+1)%3), is_correct:ok, awarded_points:awarded, created_at:BASE_TS-randInt(0,25)*86400000});
+    }
+  }
+  // (6) ルーレット
+  for(const su of seedUsers){
+    const sp=randInt(0,12);
+    for(let s=0;s<sp;s++){ let rid = rnd()<0.6? pick(su.cl) : (rnd()<0.4? pick(standards) : pick(ids)); db.insert('roulette_spins',{user_id:su.u.id, restaurant_id:rid, created_at:BASE_TS-randInt(0,25)*86400000}); }
+  }
+  // (7) A/Bイベント（A=0.45 / B=0.58 ±noise の再エンゲージ率）
+  for(const su of seedUsers){
+    const imp=randInt(3,8); const rate=(su.u.ab_group==='A'?0.38:0.62)+(rnd()-0.5)*0.05;
+    for(let m=0;m<imp;m++){ db.insert('ab_events',{user_id:su.u.id, ab_group:su.u.ab_group, event_type:'impression', created_at:BASE_TS-randInt(0,25)*86400000});
+      if(rnd()<rate) db.insert('ab_events',{user_id:su.u.id, ab_group:su.u.ab_group, event_type:'reengage', created_at:BASE_TS-randInt(0,25)*86400000}); }
+  }
+  // 整合確定: 擬似userの派生値（points/quiz_correct/title）
+  for(const su of seedUsers){
+    const uid=su.u.id;
+    const qc=db.count('quiz_attempts',{user_id:uid,is_correct:1});
+    const awarded=db.where('quiz_attempts',{user_id:uid}).reduce((s,a)=>s+(a.awarded_points||0),0);
+    const spins=db.count('roulette_spins',{user_id:uid});
+    const regs=db.count('restaurants',{created_by:uid});
+    db.update('users',uid,{quiz_correct:qc, points: awarded + B_SPIN*spins + B_REG*regs, title:titleFor(qc)});
+  }
+  // クイズ base_points を実集計 p から再計算
+  for(let qi=0; qi<6; qi++){ const qid='q_'+pad2(qi); db.update('quiz_questions',qid,{base_points: pointsFor(quizStats(qid).p)}); }
+}
+function ensureGuest(){
+  let id=currentUserId();
+  if(id && db.get('users',id)) return id;
+  const me=db.insert('users',{handle:'あなた', avatar:'🙂', points:0, quiz_correct:0, title:'グルメ見習い', ab_group: rnd()<0.5?'A':'B', is_seed:0, created_at:Date.now(), last_active_at:Date.now()});
+  metaSet('current_user_id', me.id);
+  return me.id;
+}
+function migrateStep1(meId){
+  if(metaGet('step1_migrated')==='1') return;
+  let v1=null; try{ v1=JSON.parse(localStorage.getItem('cocoico_v1')||'null'); }catch(e){}
+  if(v1){
+    const N2I=nameToIdMap();
+    (v1.registered||[]).forEach(s=>{ try{ let ex=db.first('restaurants',r=>r.name.replace(/\s/g,'')===String(s.name||'').replace(/\s/g,'')); if(!ex){ ex=db.insert('restaurants',{ name:s.name, emoji:s.emoji||(s.cafe?'☕':'🍽️'), mood:s.mood||[], dist:s.dist||5, price:s.price||'1000〜2000円', reserve:s.reserve||'予約してもしなくてもいい', smoke:s.smoke||'分煙', niche:s.niche||'中堅', yum:s.yum||['コスパ重視'], owner:s.owner||'フレンドリー', atmos:s.atmos||['ワイワイ・ガヤガヤ'], people:s.people||['1人','2人'], companion:s.companion||['仲のいい友達'], time:s.time||['ランチ','ディナー'], brk:s.brk||['放課後・全休'], point:s.point||'', cafe:s.cafe?1:0, cafe_tags:s.cafeTags||[], created_by:meId, is_seed:0, created_at:Date.now() }); } N2I[ex.name]=ex.id; }catch(e){} });
+    (v1.favs||[]).forEach(nm=>{ const rid=N2I[nm]||(db.first('restaurants',r=>r.name===nm)||{}).id; if(rid){ try{ db.insert('favorites',{user_id:meId, restaurant_id:rid, created_at:Date.now()}); }catch(e){} } });
+    if(typeof v1.points==='number') db.update('users',meId,{points:v1.points});
+    if(typeof v1.quizCorrect==='number') db.update('users',meId,{quiz_correct:v1.quizCorrect, title:titleFor(v1.quizCorrect)});
+    metaSet('step1_migrated','1');
+    setTimeout(()=>toast('🍙','Step1のデータを引き継ぎました'), 900);
+  } else { metaSet('step1_migrated','1'); }
+}
+function bootStep2(){
+  if(metaGet('seeded')!=='1'){ seedCommunity(); metaSet('seeded','1'); metaSet('schema_version','2'); metaSet('rng_seed',String(RNG_SEED)); }
+  const meId=ensureGuest();
+  migrateStep1(meId);
+  return meId;
+}
+
+/* =========================================================
+   機能4: 共起レコメンド（Jaccard係数）
+   ========================================================= */
+let favSets=null, favSetsDirty=true;
+function buildFavSets(){ favSets=new Map(); for(const f of db.all('favorites')){ if(!favSets.has(f.restaurant_id)) favSets.set(f.restaurant_id,new Set()); favSets.get(f.restaurant_id).add(f.user_id); } favSetsDirty=false; }
+function recommendFor(rid,k,minCo){ k=k||3; minCo=minCo||1; if(favSetsDirty||!favSets) buildFavSets();
+  const target=favSets.get(rid)||new Set(); if(target.size===0) return [];
+  const out=[];
+  favSets.forEach((set,oid)=>{ if(oid===rid) return; const s=set.size<target.size?set:target, l=set.size<target.size?target:set; let inter=0; s.forEach(u=>{ if(l.has(u)) inter++; }); if(inter<minCo) return; const uni=set.size+target.size-inter; const j=uni===0?0:inter/uni; out.push({restaurant_id:oid, jaccard:j, common:inter, favCount:set.size, percent:Math.round(j*100)}); });
+  out.sort((a,b)=> b.jaccard-a.jaccard || b.favCount-a.favCount || (db.get('restaurants',a.restaurant_id).name).localeCompare(db.get('restaurants',b.restaurant_id).name));
+  return out.slice(0,k);
+}
+function cooccurHtml(rid){
+  if(!rid) return '';
+  const recs=recommendFor(rid,3,1);
+  if(!recs.length) return `<div class="cooccur"><div class="cooccur-h">❤️ この店が好きな人はこれも</div><div class="cooccur-empty">まだおすすめできる店が少ないみたい。お気に入り登録でおすすめが育ちます🌱</div></div>`;
+  const cards=recs.map(c=>{ const r=db.get('restaurants',c.restaurant_id); if(!r) return ''; return `<div class="co-card"><div class="co-emoji">${r.emoji||'🍽️'}</div><div class="co-name">${esc(r.name)}</div><div class="co-bar"><i style="width:${c.percent}%"></i></div><div class="co-meta">一致度${c.percent}% ・ 共通${c.common}人</div></div>`; }).join('');
+  return `<div class="cooccur"><div class="cooccur-h">❤️ この店が好きな人はこれも</div><div class="co-row">${cards}</div></div>`;
+}
+
+/* =========================================================
+   機能6: お気に入り（id基準）/ プロフィール
+   ========================================================= */
+function isFavId(rid){ const u=getCurrentUser(); if(!u) return false; return !!db.first('favorites',{user_id:u.id, restaurant_id:rid}); }
+function toggleFavId(rid, el){
+  const u=getCurrentUser(); if(!u) return;
+  const ex=db.first('favorites',{user_id:u.id, restaurant_id:rid});
+  if(ex){ db.remove('favorites',{id:ex.id}); if(el){ el.textContent='🤍'; el.classList.remove('on'); } }
+  else { try{ db.insert('favorites',{user_id:u.id, restaurant_id:rid, created_at:Date.now()}); }catch(e){} if(el){ el.textContent='❤️'; el.classList.add('on'); } toast('❤️','お気に入りに追加'); }
+  favSetsDirty=true; maybeReengage('fav'); refreshStats(false);
+}
+function restaurantIdByName(name){ const r=db.first('restaurants',x=>x.name===name) || db.first('restaurants',x=>x.name.replace(/\s/g,'')===String(name).replace(/\s/g,'')); return r? r.id : null; }
+function regByHtml(r){ if(!r||!r.created_by||r.created_by==='seed_system'||r.is_seed===1) return ''; const me=r.created_by===currentUserId(); const u=db.get('users',r.created_by); return `<span class="reg-by">${me?'🙌 あなたが登録':'by '+esc(u?u.handle:'誰か')}</span>`; }
+
+/* ---------- プロフィール切替 ---------- */
+function listProfiles(){ return { real: db.where('users',{is_seed:0}).sort((a,b)=>(b.points||0)-(a.points||0)), seed: db.where('users',{is_seed:1}).sort((a,b)=>(b.points||0)-(a.points||0)) }; }
+function login(uid){ if(!db.get('users',uid)) return; metaSet('current_user_id',uid); db.update('users',uid,{last_active_at:Date.now()}); favSetsDirty=true;
+  const u=db.get('users',uid); toast(u.avatar||'👤', (u.handle||'ユーザー')+' としてログイン中'); renderAll(); }
+function createProfile(handle, avatar){
+  handle=(handle||'').trim()||'ゲスト'; let me;
+  try{ me=db.insert('users',{handle, avatar:avatar||'🙂', points:0, quiz_correct:0, title:'グルメ見習い', ab_group: rnd()<0.5?'A':'B', is_seed:0, created_at:Date.now(), last_active_at:Date.now()}); }
+  catch(e){ me=db.insert('users',{handle:handle+'_'+Date.now().toString(36).slice(-3), avatar:avatar||'🙂', points:0, quiz_correct:0, title:'グルメ見習い', ab_group: rnd()<0.5?'A':'B', is_seed:0, created_at:Date.now(), last_active_at:Date.now()}); }
+  login(me.id);
+}
+function renderAll(){ refreshStats(true); const act=document.querySelector('section.active'); if(!act) return; const id=act.id;
+  if(id==='cafe') renderCafe(); if(id==='quiz') renderQuiz(); if(id==='dashboard') DASH_render(); if(id==='mypage') renderMyPage(); }
+
+/* =========================================================
+   機能5: 称賛演出A/Bテスト
+   ========================================================= */
+let pendingReengage=null;
+function logImpression(uid){ const u=db.get('users',uid); const g=u? u.ab_group : (rnd()<0.5?'A':'B'); const ev=db.insert('ab_events',{user_id:uid, ab_group:g, event_type:'impression', created_at:Date.now()}); pendingReengage={uid, group:g, impId:ev.id}; return g; }
+function maybeReengage(){ if(!pendingReengage) return; const pr=pendingReengage; pendingReengage=null; db.insert('ab_events',{user_id:pr.uid, ab_group:pr.group, event_type:'reengage', created_at:Date.now()}); }
+function abAggregate(includeSeed){
+  const rows=db.where('ab_events', includeSeed? null : (e=>{ const u=db.get('users',e.user_id); return u && u.is_seed===0; }));
+  const agg={A:{imp:0,re:0}, B:{imp:0,re:0}};
+  for(const e of rows){ if(!agg[e.ab_group]) continue; if(e.event_type==='impression') agg[e.ab_group].imp++; else if(e.event_type==='reengage') agg[e.ab_group].re++; }
+  return agg;
+}
+function computeAbResult(agg){
+  const nA=agg.A.imp, xA=agg.A.re, nB=agg.B.imp, xB=agg.B.re;
+  if(nA===0||nB===0) return {ok:false};
+  const z=stats.twoPropZ(xA,nA,xB,nB); const pval=2*(1-stats.normCdf(Math.abs(z.z))); const ci=stats.diffCI(xA,nA,xB,nB);
+  const sig=Math.abs(z.z)>1.96; const winner=sig? (z.p2>z.p1?'B':'A') : null;
+  return {ok:true, nA,xA,nB,xB, pA:z.p1, pB:z.p2, z:z.z, pval, ci, sig, winner};
+}
+
+/* =========================================================
+   機能2: ダッシュボード（ランキング/記述統計/度数分布）＋3/5表示
+   ========================================================= */
+function fmt(x,d){ d=d==null?2:d; return (Math.round(x*Math.pow(10,d))/Math.pow(10,d)).toFixed(d); }
+function DASH_metrics(){
+  const favC=db.countBy(db.all('favorites'), f=>f.restaurant_id);
+  const spinC=db.countBy(db.all('roulette_spins'), s=>s.restaurant_id);
+  const rows=db.all('restaurants').map(r=>{ const fav=favC.get(r.id)||0, spin=spinC.get(r.id)||0, reg=r.is_seed===0?1:0; return { r, fav, spin, reg, score:3*reg+2*fav+1*spin }; });
+  rows.sort((a,b)=> b.score-a.score || b.fav-a.fav || a.r.name.localeCompare(b.r.name));
+  return rows;
+}
+function barChart(map, total, palette){
+  const entries=[...map.entries()]; const max=Math.max(1,...entries.map(e=>e[1]));
+  return entries.map(([k,v],i)=>`<div class="dbar"><span class="dbar-l">${esc(String(k))}</span><span class="dbar-t"><i style="width:${Math.round(v/max*100)}%;background:${palette[i%palette.length]}"></i></span><span class="dbar-v">${v}<small>(${Math.round(v/total*100)}%)</small></span></div>`).join('');
+}
+function DASH_render(){
+  const body=document.getElementById('dashBody'); if(!body) return;
+  const rows=DASH_metrics(); const top=rows.slice(0,10);   // 並び順は人気度（登録/お気に入り/当選）で算出。表示は数字を出さず自然に
+  const maxFav=Math.max(1, ...rows.map(x=>x.fav));
+  const medal=['🥇','🥈','🥉'];
+  const rankHtml=top.map((x,i)=>{ const r=x.r;
+    return `<div class="rank-row"><div class="rank-no">${i<3?medal[i]:(i+1)}</div><div class="rank-emoji">${r.emoji}</div>
+      <div class="rank-main"><div class="rank-name">${esc(r.name)} ${nicheBadge(r.niche)}</div>
+        <div class="rank-bar"><i class="seg-fav" style="width:${Math.max(6,Math.round(x.fav/maxFav*100))}%"></i></div>
+        <div class="rank-sub">❤️ ${x.fav}人がお気に入り${x.spin?` ・ 🎯 ${x.spin}回ヒット`:''}</div></div></div>`; }).join('');
+  body.innerHTML=`<div class="dash-block">${rankHtml||'<div class="cooccur-empty">まだデータがありません。お気に入り登録やルーレットで盛り上げよう！</div>'}</div>`;
+}
+
+/* =========================================================
+   機能6: マイページ
+   ========================================================= */
+function renderMyPage(){
+  const body=document.getElementById('mypageBody'); if(!body) return;
+  const u=getCurrentUser(); if(!u){ body.innerHTML=''; return; }
+  const qc=u.quiz_correct||0; const cur=titleFor(qc);
+  const next=TITLES.find(t=>t.n>qc); const lo=(()=>{ let l=0; for(const t of TITLES){ if(qc>=t.n) l=t.n; } return l; })();
+  const prog = next? Math.round((qc-lo)/(next.n-lo)*100) : 100;
+  const favRows=db.where('favorites',{user_id:u.id}).map(f=>db.get('restaurants',f.restaurant_id)).filter(Boolean);
+  const myRegs=db.where('restaurants',{created_by:u.id});
+  const pf=listProfiles();
+  const opt=(arr,label)=> arr.length? `<optgroup label="${label}">`+arr.map(p=>`<option value="${p.id}" ${p.id===u.id?'selected':''}>${p.avatar||'👤'} ${esc(p.handle)}（${p.points||0}pt）</option>`).join('')+'</optgroup>' : '';
+  body.innerHTML=`
+    <div class="mp-card">
+      <div class="mp-top"><div class="mp-avatar">${u.avatar||'🙂'}</div>
+        <div><div class="mp-handle">${esc(u.handle)}</div><span class="mp-title">👑 ${cur}</span></div>
+        <div class="mp-pts num">${u.points||0}<small>pt</small></div></div>
+      <div class="mp-prog"><div class="mp-prog-l">${next? '次の称号「'+next.t+'」まであと '+(next.n-qc)+'問' : '最高称号に到達！'}</div><div class="mp-prog-bar"><i style="width:${prog}%"></i></div></div>
+    </div>
+    <div class="mp-switch">
+      <label>プロフィール切替</label>
+      <select onchange="login(this.value)">${opt(pf.real,'あなた/実プレイヤー')}${opt(pf.seed,'コミュニティ(擬似)')}</select>
+      <button class="btn ghost sm tap" onclick="openNewProfile()">＋ 新規プロフィール</button>
+      <div class="mp-note">※ プロフィールはこの端末に保存されます。切り替えると、その人の視点でお気に入り・おすすめが見られます。</div>
+    </div>
+    <div class="mp-sec"><h3 class="dash-h">❤️ お気に入り（${favRows.length}）</h3>${favRows.length? favRows.map((r,i)=>restoCard(r,null,i*60,false)).join('') : '<div class="cooccur-empty">まだありません。🔥厳選や☕喫茶でお気に入り登録してみよう。</div>'}</div>
+    <div class="mp-sec"><h3 class="dash-h">✨ 登録した店（${myRegs.length}）</h3>${myRegs.length? myRegs.map((r,i)=>restoCard(r,null,i*60,false)).join('') : '<div class="cooccur-empty">まだありません。＋登録から新しい店を開拓しよう。</div>'}</div>`;
+}
+function openNewProfile(){
+  const box=document.getElementById('praiseBox');
+  box.innerHTML=`<div class="big">👤</div><h3 class="grad-text">新規プロフィール</h3>
+    <div class="field" style="text-align:left"><label>ハンドル名</label><input id="npHandle" type="text" maxlength="16" placeholder="例）腹ペコ大学生"></div>
+    <div class="field" style="text-align:left"><label>アバター</label><div class="chips" id="npAvatar">${['🙂','🍙','🍜','🍰','🍛','☕','🍣','🔥'].map((a,i)=>`<div class="chip tap ${i===0?'sel':''}" data-v="${a}" onclick="[...this.parentNode.children].forEach(c=>c.classList.remove('sel'));this.classList.add('sel')">${a}</div>`).join('')}</div></div>
+    <div class="modal-actions"><button class="btn ghost sm tap" onclick="closePraise()">やめる</button><button class="btn sm tap" onclick="submitNewProfile()">作成してログイン</button></div>`;
+  document.getElementById('modalLayer').classList.add('show');
+}
+function submitNewProfile(){
+  const h=document.getElementById('npHandle').value.trim();
+  const av=(document.querySelector('#npAvatar .chip.sel')||{}).dataset;
+  closePraise(); createProfile(h||'ゲスト', av? av.v : '🙂');
+}
+
+/* =========================================================
+   WebAudio 効果音エンジン（合成のみ・外部音源なし）
+   ========================================================= */
+let AC=null;
+function audio(){ if(muted) return null; try{ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }catch(e){ return null; } }
+function tone(freq, dur, type='sine', vol=0.1, glideTo=null, when=0){
+  const ac=audio(); if(!ac) return;
+  const t=ac.currentTime+when;
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  if(glideTo) o.frequency.linearRampToValueAtTime(glideTo, t+dur);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t+dur+0.02);
+}
+let lastTap=0;
+function sfxTap(){ const n=performance.now(); if(n-lastTap<45) return; lastTap=n; tone(460,0.06,'sine',0.06,680); }
+function sfxTick(vel){ tone(1200,0.012,'square',Math.min(0.05,0.02+vel*0.06)); }
+function sfxWin(){ const ac=audio(); if(!ac) return; [523,659,784].forEach((f,i)=>tone(f,0.5,'triangle',0.08,null,i*0.06)); tone(1568,0.3,'sine',0.05,null,0.18); }
+function sfxFanfare(){ const ac=audio(); if(!ac) return; [392,523,659,784].forEach((f,i)=>tone(f,0.32,'triangle',0.09,null,i*0.09)); tone(1046,0.4,'sine',0.06,null,0.36);
+  // 紙吹雪同期ノイズ
+  if(ac){ const b=ac.createBuffer(1,ac.sampleRate*0.18,ac.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length); const s=ac.createBufferSource(); const g=ac.createGain(); g.gain.value=0.05; s.buffer=b; s.connect(g).connect(ac.destination); s.start(); } }
+function sfxQuiz(ok, combo){ if(ok){ const base=880+Math.min(combo,8)*40; tone(base,0.12,'sine',0.08,base*1.5);} else { tone(220,0.16,'sawtooth',0.05,180);} }
+function sfxRank(){ const ac=audio(); if(!ac) return; [392,494,587,740,880].forEach((f,i)=>tone(f,0.4,'triangle',0.09,null,i*0.1)); tone(80,0.5,'sine',0.12,null,0); }
+function toggleMute(){
+  muted=!muted; localStorage.setItem('cocoico_muted', muted?'1':'0');
+  document.getElementById('muteBtn').textContent = muted?'🔇':'🔊';
+  if(!muted){ audio(); sfxTap(); toast('🔊','効果音オン'); } else { toast('🔇','ミュート'); }
+}
+
+/* =========================================================
+   共通モーション基盤
+   ========================================================= */
+function esc(s){ return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+let toastTimer;
+function toast(icon,msg,gold){
+  const t=document.getElementById('toast');
+  t.innerHTML = (icon?`<span>${icon}</span>`:'')+`<span>${esc(msg)}</span>`;
+  t.classList.toggle('gold', !!gold); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'), 2600);
+}
+/* count-up エンジン */
+function animateNumber(el, from, to, dur=700){
+  if(from===to){ el.textContent=to; return; }
+  const start=performance.now(); const diff=to-from;
+  function frame(now){
+    const p=Math.min(1,(now-start)/dur); const e=1-Math.pow(1-p,3);
+    el.textContent = Math.round(from+diff*e);
+    if(p<1) requestAnimationFrame(frame); else el.textContent=to;
+  }
+  requestAnimationFrame(frame);
+}
+let prevStats={points:0, reg:0, quiz:0, rank:''};
+function refreshStats(initial){
+  const reg=store.registered.length, rank=currentTitle().t;
+  document.getElementById('ptDisplay').textContent=store.points;
+  // ホームのスコアボード
+  const map=[['sbPt','md-pt',prevStats.points,store.points],['sbReg','md-reg',prevStats.reg,reg],['sbQuiz','md-quiz',prevStats.quiz,store.quizCorrect]];
+  map.forEach(([id,medal,from,to])=>{
+    const el=document.getElementById(id);
+    if(initial){ el.textContent=to; }
+    else { animateNumber(el, from, to); if(to>from){ floatPlus(medal, to-from); document.getElementById(medal).classList.add('flash'); setTimeout(()=>document.getElementById(medal).classList.remove('flash'),520);} }
+  });
+  document.getElementById('sbRank').textContent=rank;
+  prevStats={points:store.points, reg, quiz:store.quizCorrect, rank};
+}
+function floatPlus(medalId, n){
+  const fp=document.querySelector('#'+medalId+' .floatp'); if(!fp) return;
+  fp.textContent='+'+n; fp.style.transition='none'; fp.style.opacity='1'; fp.style.transform='translateY(0)';
+  requestAnimationFrame(()=>{ fp.style.transition='all .8s var(--ease-out)'; fp.style.opacity='0'; fp.style.transform='translateY(-16px)'; });
+}
+function currentTitle(){ let c=TITLES[0]; TITLES.forEach(t=>{ if(store.quizCorrect>=t.n) c=t; }); return c; }
+
+/* ---------- ビュー遷移（とろみワイプ + FLIP絵文字） ---------- */
+const SECT_EMOJI={strict:'te-strict',roulette:'te-roulette',quiz:'te-quiz',register:'te-register',cafe:'te-cafe'};
+let lastTapXY={x:innerWidth/2,y:80};
+document.addEventListener('pointerdown', e=>{ lastTapXY={x:e.clientX,y:e.clientY}; }, {capture:true});
+function reducedMotion(){ return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+function go(id, srcEl){
+  const cur=document.querySelector('section.active');
+  if(cur && cur.id===id){ return; }
+  // FLIP: モードカードの絵文字を次画面の見出し絵文字へ飛ばす
+  let flySrc=null;
+  if(srcEl){ const em=srcEl.querySelector('.me-emoji'); if(em) flySrc=em; }
+  const wipe=document.getElementById('wipe');
+  const doSwap=()=>{
+    document.querySelectorAll('section').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('nav.dock button.navb').forEach(b=>b.classList.toggle('on', b.dataset.nav===id));
+    window.scrollTo({top:0,behavior:'auto'});
+    if(id==='strict') startStrict();
+    if(id==='roulette') drawWheel();
+    if(id==='quiz') renderQuiz();
+    if(id==='cafe') renderCafe();
+    if(id==='dashboard') DASH_render();
+    if(id==='mypage') renderMyPage();
+    refreshStats(true);
+    if(flySrc && SECT_EMOJI[id]) flyEmoji(flySrc, document.getElementById(SECT_EMOJI[id]));
+  };
+  if(reducedMotion()){ doSwap(); return; }
+  // とろみワイプ（clip-pathのみで制御。idleはcircle(0%)で不可視・pointer-events:none）
+  wipe.style.setProperty('--wx', lastTapXY.x+'px');
+  wipe.style.setProperty('--wy', lastTapXY.y+'px');
+  wipe.style.transition='none'; wipe.style.clipPath='circle(0% at var(--wx) var(--wy))';
+  requestAnimationFrame(()=>{
+    wipe.style.transition='clip-path 300ms var(--ease-wipe)';
+    wipe.style.clipPath='circle(150% at var(--wx) var(--wy))';
+  });
+  setTimeout(()=>{
+    doSwap();
+    wipe.style.transition='clip-path 380ms var(--ease-wipe)';
+    wipe.style.clipPath='circle(0% at var(--wx) var(--wy))';
+  }, 310);
+}
+function flyEmoji(srcEl, destEl){
+  try{
+    const s=srcEl.getBoundingClientRect(), d=destEl.getBoundingClientRect();
+    const fly=document.getElementById('flyer');
+    fly.textContent=srcEl.textContent;
+    fly.style.display='block';
+    fly.style.left=s.left+'px'; fly.style.top=s.top+'px';
+    fly.style.transform='translate(0,0) scale(1)'; fly.style.opacity='1';
+    fly.style.transition='none';
+    const dx=(d.left+d.width/2)-(s.left+s.width/2), dy=(d.top+d.height/2)-(s.top+s.height/2);
+    requestAnimationFrame(()=>{
+      fly.style.transition='transform 520ms var(--ease-out), opacity 520ms ease';
+      fly.style.transform=`translate(${dx}px,${dy}px) scale(${(d.height/s.height)||0.8})`;
+    });
+    setTimeout(()=>{ fly.style.opacity='0'; }, 460);
+    setTimeout(()=>{ fly.style.display='none'; }, 560);
+  }catch(e){}
+}
+
+/* ---------- 外部リンク ---------- */
+function hpUrl(n){ return "https://www.hotpepper.jp/CSP/qsearch/?freeword="+encodeURIComponent(n); }
+function tbUrl(n){ return "https://tabelog.com/rstLst/?sk="+encodeURIComponent(n); }
+
+/* ---------- 店舗カード ---------- */
+function rarityClass(n){ return n==='秘境'?'r-legend':(n==='中堅'?'r-mid':'r-common'); }
+function nicheBadge(n){ const m={'秘境':['b-niche-legend','🗺️ 秘境'],'中堅':['b-niche-mid','🏮 知る人ぞ知る'],'定番':['b-niche-common','⭐ 定番']}; const x=m[n]||m['定番']; return `<span class="badge ${x[0]}">${x[1]}</span>`; }
+function isFav(n){ return store.favs.includes(n); }
+function restoCard(r, score, delay, recs){
+  const mine = (r.created_by && r.created_by===currentUserId()) || r.userAdded;
+  const newB = mine ? '<span class="badge b-new">✨ あなたの発見</span>' : '';
+  const sc = (score!=null)? `<div class="score-chip"><b class="num">${score}</b><small>match</small></div>` : '';
+  const mood=(r.mood||[]).slice(0,2).map(m=>`<span class="badge b-mood">${m}</span>`).join('');
+  const yum=(r.yum||[]).slice(0,1).map(y=>`<span class="badge b-yum">${y}</span>`).join('');
+  const favOn = r.id? isFavId(r.id) : false;
+  const favClick = r.id? `toggleFavId('${r.id}',this)` : `toggleFav('${esc(r.name).replace(/'/g,'')}',this)`;
+  return `<div class="resto ${rarityClass(r.niche)}" style="--d:${delay||0}ms">
+    <span class="rarity"></span>
+    <div class="rtop">
+      <div class="emoji">${r.emoji||'🍽️'}</div>
+      <div style="flex:1;min-width:0;">
+        <h3>${esc(r.name)}</h3>
+        <div class="meta">📍 大学から徒歩${r.dist}分 ・ ${r.price} ・ ${r.reserve} ${regByHtml(r)}</div>
+        <div class="badges">${nicheBadge(r.niche)}${mood}${yum}${newB}</div>
+      </div>${sc}
+    </div>
+    <p class="point">💬 ${esc(r.point)}</p>
+    <div class="links">
+      <button class="favbtn tap ${favOn?'on':''}" onclick="${favClick}" title="お気に入り">${favOn?'❤️':'🤍'}</button>
+      <a class="l-hp tap" href="${hpUrl(r.name)}" target="_blank" rel="noopener">🔥 ホットペッパー</a>
+      <a class="l-tb tap" href="${tbUrl(r.name)}" target="_blank" rel="noopener">食べログ</a>
+    </div>
+    ${recs===false? '' : cooccurHtml(r.id)}
+  </div>`;
+}
+function toggleFav(name, el){ const rid=restaurantIdByName(name); if(rid) toggleFavId(rid, el); }
+
+/* =========================================================
+   厳選モード（チャットボット）
+   ========================================================= */
+const CHAT_STEPS=[
+  {key:"companion",q:"誰と行くのかな？🙂",opts:OPT.companion,ing:"🧑‍🤝‍🧑"},
+  {key:"people",q:"何人で行く予定？👥",opts:OPT.people,ing:"🪑"},
+  {key:"time",q:"いつ行く？時間帯を教えて🕐",opts:OPT.time,ing:"🕐"},
+  {key:"price",q:"予算はどれくらい？💰",opts:OPT.price,ing:"💰"},
+  {key:"mood",q:"今日はどんな気分？🍴",opts:OPT.mood,ing:"🍜"},
+  {key:"atmos",q:"お店の雰囲気の希望は？✨",opts:OPT.atmos,ing:"🏮"},
+  {key:"smoke",q:"たばこは？🚭",opts:OPT.smoke,ing:"🌿"},
+];
+let chatIdx=0, chatAns={};
+/* =========================================================
+   Step3: Gemini API による曖昧検索（AIチャット厳選）
+   - APIキーはコードに埋め込まず、各ユーザーがアプリ内で入力しlocalStorageに保存
+   - リスト外の店を作らないよう制約＋構造化出力(responseSchema)
+   - キー未設定/通信失敗時はローカルのキーワード曖昧検索にフォールバック
+   ========================================================= */
+/* ============================================================
+   ▼ AI検索の Proxy URL（鍵はここに書かない！Proxy側に隠す）▼
+   Cloudflare Workers 等にデプロイしたProxyのURLを下の "" に貼ってください。
+   例: const AI_PROXY_URL = "https://cocoico-ai.xxxx.workers.dev";
+
+   ※URL自体は公開してOK（秘密の API キーは Proxy の環境変数に置く）
+   ※空のままでもアプリは動きます（AI検索はキーワード検索に自動で切替）
+   ============================================================ */
+const AI_PROXY_URL = "";
+
+async function geminiSearch(userText){
+  if(!AI_PROXY_URL) throw {code:'NOKEY'};
+  const url=AI_PROXY_URL;
+  const restos=db.where('restaurants',{cafe:0}).map(r=>({id:r.id,name:r.name,
+    ジャンル:(r.mood||[]).join('・'),予算:r.price,雰囲気:(r.atmos||[]).join('・'),
+    同行:(r.companion||[]).join('・'),時間帯:(r.time||[]).join('・'),知名度:r.niche,一言:r.point}));
+  const sys='あなたは大学前の飲食店レコメンドAI「ココ助」。親しみやすいタメ口で話す。'+
+    'ユーザーの曖昧・口語的な要望（気分・シーン・予算・人数など）を汲み取り、必ず下の店リストの中だけから最適な店を1〜3軒選ぶ。'+
+    'リストにない店は絶対に作らない。idはリストのものを正確に使う。各店に短く具体的な推し理由(reason)を添え、replyは1〜2文で。\n# 店リスト(JSON)\n'+JSON.stringify(restos);
+  const body={ systemInstruction:{parts:[{text:sys}]}, contents:[{role:'user',parts:[{text:userText}]}],
+    generationConfig:{ temperature:0.7, thinkingConfig:{thinkingBudget:0}, responseMimeType:'application/json',
+      responseSchema:{ type:'OBJECT', properties:{
+        reply:{type:'STRING'},
+        picks:{type:'ARRAY', items:{ type:'OBJECT', properties:{ id:{type:'STRING'}, reason:{type:'STRING'} } } }
+      } } } };
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok){ let t=''; try{t=await res.text();}catch(e){} throw {code:'HTTP',status:res.status,detail:t}; }
+  const data=await res.json();
+  const c=data&&data.candidates&&data.candidates[0];
+  const txt=c&&c.content&&c.content.parts&&c.content.parts[0]&&c.content.parts[0].text;
+  if(!txt) throw {code:'EMPTY'};
+  let out; try{ out=JSON.parse(txt); }catch(e){ throw {code:'PARSE'}; }
+  return out;
+}
+
+/* ローカル・キーワード曖昧検索（鍵なし/失敗時のフォールバック） */
+function localFuzzy(text){
+  const a={};
+  OPT.mood.forEach(m=>{ if(text.includes(m)) a.mood=m; });
+  OPT.atmos.forEach(m=>{ if(text.includes(m)) a.atmos=m; });
+  OPT.companion.forEach(m=>{ if(text.includes(m)) a.companion=m; });
+  if(/静|落ち着|ゆっくり|読書|集中/.test(text)) a.atmos='静か・落ち着き';
+  if(/おしゃれ|オシャレ|綺麗|きれい|雰囲気/.test(text)) a.atmos='おしゃれ・洗練';
+  if(/わいわい|ワイワイ|賑|にぎ|盛り上が/.test(text)) a.atmos='ワイワイ・ガヤガヤ';
+  if(/デート|恋人|彼女|彼氏|記念日/.test(text)) a.companion='恋人';
+  if(/打ち上げ|大人数|サークル|ゼミ|団体/.test(text)) a.companion='サークル・ゼミ仲間';
+  if(/ひとり|一人|1人|ぼっち/.test(text)) a.companion='ひとりで';
+  if(/がっつり|ガッツリ|こってり|腹|ボリューム|肉/.test(text)) a.mood='がっつり・こってり';
+  if(/ヘルシー|あっさり|軽め|野菜/.test(text)) a.mood='あっさり・ヘルシー';
+  if(/和食|寿司|天ぷら|定食|そば|うどん/.test(text)) a.mood=a.mood||'和食';
+  if(/イタリア|パスタ|洋食|ハンバーグ|カレー/.test(text)) a.mood=a.mood||'洋食';
+  if(/中華|ラーメン|餃子/.test(text)) a.mood=a.mood||'中華';
+  if(/カフェ|喫茶|甘い|スイーツ|デザート/.test(text)) a.mood='軽食・甘いもの';
+  if(/安い|コスパ|学割|節約|お得/.test(text)) a.price='1000円未満';
+  const mm=text.match(/(\d{3,5})\s*円/);
+  if(mm){ const v=+mm[1]; a.price = v<1000?'1000円未満': v<2000?'1000〜2000円': v<3000?'2000〜3000円': v<5000?'3000〜5000円':'5000円以上'; }
+  let ranked=db.where('restaurants',{cafe:0}).map(r=>({r,s:scoreResto(r,a)})).sort((x,y)=>y.s-x.s).slice(0,3);
+  if(!ranked.some(x=>x.s>0)) ranked=db.where('restaurants',{cafe:0}).slice(0,3).map(r=>({r,s:0}));
+  return ranked;
+}
+
+function showTyping(){
+  const log=document.getElementById('chatLog');
+  const t=document.createElement('div'); t.className='bubble bot';
+  t.innerHTML='<div class="who"><span class="av">🍳</span>ココ助</div><div class="typing"><i></i><i></i><i></i></div>';
+  log.appendChild(t); scrollChat(); return t;
+}
+function removeTyping(t){ if(t&&t.parentNode) t.remove(); }
+function appendCards(items){ // items: [{r, reason?}]
+  const log=document.getElementById('chatLog'); let html='<div class="ai-cards">';
+  items.forEach((it,i)=>{ if(!it.r) return; if(it.reason) html+='<div class="ai-reason">💡 '+esc(it.reason)+'</div>'; html+=restoCard(it.r,null,i*100,false); });
+  html+='</div>'; log.insertAdjacentHTML('beforeend', html); scrollChat();
+}
+
+let aiBusy=false;
+async function aiSend(){
+  if(aiBusy) return;
+  const inp=document.getElementById('aiInput'); const text=((inp&&inp.value)||'').trim(); if(!text) return;
+  inp.value=''; meSay(text);
+  document.getElementById('simmer').style.display='none';
+  document.getElementById('chatChoices').innerHTML=''; document.getElementById('chatResult').innerHTML='';
+  aiBusy=true; const typing=showTyping();
+  try{
+    const out=await geminiSearch(text);
+    removeTyping(typing);
+    botSay(esc(out.reply||'こんなお店はどう？').replace(/\n/g,'<br>'));
+    const picks=(out.picks||[]).map(p=>({r:db.get('restaurants',p.id), reason:p.reason})).filter(x=>x.r);
+    if(picks.length) appendCards(picks);
+    else appendCards(localFuzzy(text));
+  }catch(e){
+    removeTyping(typing);
+    if(e.code!=='NOKEY'){ botSay('うまく繋がらなかった…キーワードから探すね！'); console.warn('AI error', e); }
+    else { botSay('キーワードから、ぴったりの店を探したよ！'); }
+    appendCards(localFuzzy(text));
+  } finally { aiBusy=false; }
+}
+
+function startStrict(){
+  document.getElementById('chatLog').innerHTML='';
+  document.getElementById('chatChoices').innerHTML='';
+  document.getElementById('chatResult').innerHTML='';
+  const sm=document.getElementById('simmer'); sm.style.display='none'; sm.innerHTML='';
+  botSay('こんにちは！AIココ助だよ🍳<br>「彼女と記念日、3000円くらいで静かな和食」みたいに、行きたいお店のイメージを自由に話しかけてね。');
+  const inp=document.getElementById('aiInput'); if(inp) setTimeout(()=>inp.focus(),120);
+}
+
+function startChat(){
+  chatIdx=0; chatAns={};
+  document.getElementById('chatLog').innerHTML='';
+  document.getElementById('chatChoices').innerHTML='';
+  document.getElementById('chatResult').innerHTML='';
+  const sm=document.getElementById('simmer'); sm.style.display='flex'; sm.innerHTML = CHAT_STEPS.map(s=>`<span class="ing">${s.ing}</span>`).join('');
+  botTyping(()=>{ botSay("OK、質問形式で絞り込もう🍳<br>いくつか聞くね！"); setTimeout(askChat,500); });
+}
+function botTyping(then){
+  const log=document.getElementById('chatLog');
+  const t=document.createElement('div'); t.className='bubble bot'; t.innerHTML='<div class="typing"><i></i><i></i><i></i></div>';
+  log.appendChild(t); scrollChat();
+  setTimeout(()=>{ t.remove(); then(); }, reducedMotion()?60:600);
+}
+function botSay(html){
+  const log=document.getElementById('chatLog');
+  log.insertAdjacentHTML('beforeend', `<div class="bubble bot"><div class="who"><span class="av">🍳</span>ココ助</div>${html}</div>`);
+  scrollChat();
+}
+function meSay(text){ document.getElementById('chatLog').insertAdjacentHTML('beforeend', `<div class="bubble me">${esc(text)}</div>`); scrollChat(); }
+function scrollChat(){ window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'}); }
+function askChat(){
+  // 煮込みゲージ
+  [...document.querySelectorAll('#simmer .ing')].forEach((e,i)=>e.classList.toggle('lit', i<chatIdx));
+  if(chatIdx>=CHAT_STEPS.length){ finishChat(); return; }
+  const step=CHAT_STEPS[chatIdx];
+  botTyping(()=>{
+    botSay(step.q);
+    document.getElementById('chatChoices').innerHTML =
+      `<div class="chips" style="margin-top:6px;">`+
+      step.opts.map((o,i)=>`<div class="chip tap" style="animation-delay:${i*55}ms" onclick="answerChat('${step.key}','${o.replace(/'/g,'')}')">${o}</div>`).join('')+`</div>`;
+  });
+}
+function answerChat(key,val){
+  chatAns[key]=val; meSay(val);
+  document.getElementById('chatChoices').innerHTML='';
+  chatIdx++; setTimeout(askChat,300);
+}
+function finishChat(){
+  [...document.querySelectorAll('#simmer .ing')].forEach(e=>e.classList.add('lit'));
+  botTyping(()=>{
+    botSay("条件にぴったりの店を厳選したよ！この中ならハズレなし、いってらっしゃい✨");
+    const ranked=allRestos().map(r=>({r,s:scoreResto(r,chatAns)})).sort((a,b)=>b.s-a.s).slice(0,3);
+    let html='<div style="margin-top:10px;">'+ranked.map((x,i)=>restoCard(x.r,x.s,i*120)).join('')+'</div>';
+    html+='<button class="btn ghost sm tap" onclick="startChat()">🔄 条件を変えてやり直す</button>';
+    document.getElementById('chatResult').innerHTML=html;
+    sfxWin();
+    scrollChat();
+  });
+}
+function scoreResto(r,a){
+  let s=0; const inc=(arr,v,p)=>{ if(v&&arr&&arr.includes(v)) s+=p; };
+  inc(r.companion,a.companion,25); inc(r.people,a.people,15); inc(r.time,a.time,15);
+  inc(r.mood,a.mood,25); inc(r.atmos,a.atmos,20);
+  if(a.price&&r.price===a.price) s+=20;
+  if(a.smoke){ const rNon=(r.smoke==="完全禁煙"||r.smoke==="分煙"||r.smoke==="禁煙より"||r.smoke==="禁煙"); if((a.smoke==="禁煙")===rNon) s+=15; }
+  s+=Math.max(0,10-r.dist);
+  return Math.min(99,s);
+}
+
+/* =========================================================
+   探索モード（ルーレット / Canvas + 物理減衰 + 磁石スナップ）
+   ========================================================= */
+let rouletteScope="all";
+document.getElementById('rouletteScope').addEventListener('click',e=>{
+  const c=e.target.closest('.chip'); if(!c) return;
+  document.querySelectorAll('#rouletteScope .chip').forEach(x=>x.classList.remove('sel'));
+  c.classList.add('sel'); rouletteScope=c.dataset.r; drawWheel();
+});
+function roulettePool(){
+  let pool=db.where('restaurants',{cafe:0});
+  if(rouletteScope!=="all") pool=db.where('restaurants',{cafe:0, niche:rouletteScope});
+  if(pool.length<2) pool=db.where('restaurants',{cafe:0});
+  return pool.slice(0,8);
+}
+const W_COLORS=["#FF6A2B","#FFC23C","#C0341C","#FF8A3D","#FFB02E","#E5431A","#FF7A2F","#FFD25A"];
+let wheelAngle=0, wheelVel=0, wheelRAF=null, wheelPool=[], spinning=false, lastUnder=-1;
+function shortName(n){ return n.length>7?n.slice(0,7)+"…":n; }
+function drawWheel(){
+  const pool=roulettePool(); wheelPool=pool;
+  const cv=document.getElementById('wheel'), ctx=cv.getContext('2d'); const SZ=300, cx=150, cy=150, R=150, N=pool.length;
+  ctx.clearRect(0,0,SZ,SZ);
+  for(let i=0;i<N;i++){
+    const a0=(i/N)*2*Math.PI-Math.PI/2, a1=((i+1)/N)*2*Math.PI-Math.PI/2;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
+    ctx.fillStyle=W_COLORS[i%W_COLORS.length]; ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.5)"; ctx.lineWidth=2; ctx.stroke();
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate((a0+a1)/2);
+    ctx.fillStyle="#fff"; ctx.font="bold 14px sans-serif"; ctx.textAlign="right"; ctx.textBaseline="middle";
+    ctx.shadowColor="rgba(0,0,0,.25)"; ctx.shadowBlur=3;
+    ctx.fillText(pool[i].emoji+" "+shortName(pool[i].name), R-16, 0);
+    ctx.restore();
+  }
+  cv.style.transform=`rotate(${wheelAngle}deg)`;
+}
+function sectorUnderPointer(angleDeg, N){
+  // ポインタ=上(-90°)。各セクタ中心のスクリーン角を計算し最寄りを返す
+  const sec=360/N; let best=0, bestD=1e9;
+  for(let i=0;i<N;i++){
+    let center=((i+0.5)*sec-90+angleDeg)%360; center=((center+540)%360)-180; // [-180,180]
+    const d=Math.abs(center-(-90)); const dd=Math.min(d,360-d);
+    if(dd<bestD){ bestD=dd; best=i; }
+  }
+  return best;
+}
+function spin(){
+  if(spinning) return;
+  const pool=wheelPool.length?wheelPool:roulettePool(); const N=pool.length;
+  spinning=true; document.getElementById('spinBtn').disabled=true;
+  document.getElementById('rouletteResult').innerHTML='';
+  lastUnder=-1;
+  if(reducedMotion()){
+    wheelAngle=(wheelAngle+720+Math.random()*360); const cv=document.getElementById('wheel'); cv.style.transform=`rotate(${wheelAngle}deg)`;
+    setTimeout(()=>finishSpin(pool, sectorUnderPointer(wheelAngle,N)), 200); return;
+  }
+  wheelVel = 16 + Math.random()*8; // deg/frame
+  const cv=document.getElementById('wheel');
+  function step(){
+    wheelAngle += wheelVel; wheelVel *= 0.985;
+    cv.style.transform=`rotate(${wheelAngle}deg)`;
+    const u=sectorUnderPointer(wheelAngle,N);
+    if(u!==lastUnder){ lastUnder=u; sfxTick(wheelVel/16); }
+    if(wheelVel<0.45){ snapAndFinish(pool,N); return; }
+    wheelRAF=requestAnimationFrame(step);
+  }
+  wheelRAF=requestAnimationFrame(step);
+}
+function snapAndFinish(pool,N){
+  const sec=360/N; const i=sectorUnderPointer(wheelAngle,N);
+  // セクタ中心を上に合わせる target angle
+  let target = wheelAngle;
+  // 現在の中心ズレを補正：center=( (i+0.5)*sec -90 + a )=-90 (mod360) → a = -(i+0.5)*sec (mod360)
+  let want = (-(i+0.5)*sec)%360;
+  let cur = wheelAngle%360;
+  let delta = (want-cur); delta=((delta+540)%360)-180;
+  target = wheelAngle + delta;
+  const cv=document.getElementById('wheel'); const start=wheelAngle, dur=420, t0=performance.now();
+  function ease(now){
+    const p=Math.min(1,(now-t0)/dur); const e=1-Math.pow(1-p,3);
+    wheelAngle=start+(target-start)*e; cv.style.transform=`rotate(${wheelAngle}deg)`;
+    if(p<1) requestAnimationFrame(ease); else finishSpin(pool,i);
+  }
+  requestAnimationFrame(ease);
+}
+function finishSpin(pool, idx){
+  spinning=false; document.getElementById('spinBtn').disabled=false;
+  const r=pool[idx];
+  if(r&&r.id&&currentUserId()){ try{ db.insert('roulette_spins',{user_id:currentUserId(), restaurant_id:r.id, created_at:Date.now()}); }catch(e){} favSetsDirty=false; }
+  maybeReengage();
+  sparkBurst(); sfxWin();
+  const banner = r.niche==='秘境' ? '🗺️ 未知の秘境を引き当てた！' : '🎉 今日のお告げはこの店！';
+  document.getElementById('rouletteResult').innerHTML=
+    `<div class="win-banner">${banner}</div><div class="win-name grad-text">${esc(r.name)}</div>`+restoCard(r,null,0)+
+    `<button class="btn ghost sm tap" onclick="spin()">🎲 もう一皿まわす</button>`;
+  if(r.niche==='秘境') toast('🗺️','秘境ヒット！冒険しよう',true);
+  window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
+}
+
+/* =========================================================
+   店舗登録（白熱フラッシュ→紙吹雪→称賛モーダル→開拓者カード）
+   ========================================================= */
+function buildRegChips(){
+  fillChips('regMood',OPT.mood,true);
+  fillChips('regPrice',OPT.price,false);
+  fillChips('regNiche',OPT.niche,false);
+  document.querySelector('#regPrice .chip').classList.add('sel');
+  document.querySelectorAll('#regNiche .chip')[2].classList.add('sel');
+}
+function fillChips(id,arr,multi){
+  const box=document.getElementById(id);
+  box.innerHTML=arr.map(o=>`<div class="chip tap" data-v="${o}">${o}</div>`).join('');
+  box.addEventListener('click',e=>{
+    const c=e.target.closest('.chip'); if(!c) return;
+    if(multi) c.classList.toggle('sel');
+    else { box.querySelectorAll('.chip').forEach(x=>x.classList.remove('sel')); c.classList.add('sel'); }
+  });
+}
+function getChips(id){ return [...document.querySelectorAll('#'+id+' .chip.sel')].map(c=>c.dataset.v); }
+function submitRegister(){
+  const name=document.getElementById('regName').value.trim();
+  const point=document.getElementById('regPoint').value.trim();
+  if(!name){ toast('✍️','店名を入力してね'); return; }
+  if(!point){ toast('✍️','おすすめポイントを書いてね'); return; }
+  const mood=getChips('regMood'); const price=getChips('regPrice')[0]||"1000〜2000円";
+  const niche=getChips('regNiche')[0]||"中堅"; const dist=parseInt(document.getElementById('regDist').value,10);
+  const isCafe=document.getElementById('regCafe').checked;
+  const uid=currentUserId();
+  const known=!!db.first('restaurants',r=>r.name.replace(/\s/g,'')===name.replace(/\s/g,''));
+  document.getElementById('regName').value=''; document.getElementById('regPoint').value=''; document.getElementById('regCafe').checked=false;
+  if(known){ addPoints(uid,10); toast('📌','登録ありがとう！ +10ココポイント'); maybeReengage(); refreshStats(false); return; }
+  let row;
+  try{
+    row=db.insert('restaurants',{ name, emoji:isCafe?'☕':'🍽️', mood:mood.length?mood:['和食'], dist, price,
+      reserve:'予約してもしなくてもいい', smoke:isCafe?'完全禁煙':'分煙', niche, yum:['コスパ重視'], owner:'フレンドリー',
+      atmos:[isCafe?'静か・落ち着き':'ワイワイ・ガヤガヤ'], people:['1人','2人'], companion:['仲のいい友達'],
+      time:['ランチ','ディナー'], brk:['放課後・全休'], point, cafe:isCafe?1:0,
+      cafe_tags:isCafe?['完全禁煙','読書向き','長居しやすい']:[], created_by:uid, is_seed:0, created_at:Date.now() });
+  }catch(e){ addPoints(uid,10); toast('📌','登録ありがとう！ +10ココポイント'); refreshStats(false); return; }
+  addPoints(uid,50); favSetsDirty=true;
+  const discoverer=db.count('restaurants');
+  showPraiseAB(name, discoverer);
+}
+function showPraiseAB(name, discoverer){
+  const uid=currentUserId();
+  const group=logImpression(uid);   // A/B群を記録（再エンゲージ計測用）
+  const body=`「${esc(name)}」はまだ誰も知らないお宝店！<br>あなたが <b>${discoverer}</b> 軒目の発見者です。`;
+  if(group==='B'){ whiteFlash(); confetti(); sfxFanfare(); showPraise('🏆','新規開拓ありがとう！', body, 50, 0, 0, name, true); }
+  else { sfxWin(); showPraise('🎉','登録ありがとう！', body, 50, 0, 0, name, false); }
+  refreshStats(false);
+}
+function showPraise(big,head,body,gain,from,to,name,pioneer){
+  const box=document.getElementById('praiseBox');
+  const pcard = pioneer ? `<div class="pioneer"><div class="inner"><div class="pt">🏅 COCOiCO 開拓者カード</div><div class="pn">${esc(name)}</div><div class="pd">発見者：あなた ・ ${new Date().getFullYear()}年の手柄</div></div></div>` : '';
+  const gainLine = gain>0 ? `<div class="gain num"><span id="gainNum">+0</span> <span style="white-space:nowrap">ココポイント</span></div>` : '';
+  const shareBtn = pioneer ? `<button class="btn ghost sm tap" onclick="sharePioneer('${esc(name).replace(/'/g,'')}')">📋 シェアする</button>` : '';
+  box.innerHTML = `<div class="big">${big}</div><h3 class="grad-text">${esc(head)}</h3><p>${body}</p>
+    ${gainLine}${pcard}
+    <div class="modal-actions">${shareBtn}
+      <button class="btn sm tap" onclick="closePraise()">やった！</button>
+    </div>`;
+  document.getElementById('modalLayer').classList.add('show');
+  // ポイントcount-up
+  if(gain>0){
+    const gn=document.getElementById('gainNum'); const t0=performance.now();
+    (function up(now){ const p=Math.min(1,(now-t0)/700); const e=1-Math.pow(1-p,3); gn.textContent='+'+Math.round(gain*e); if(p<1) requestAnimationFrame(up); else gn.textContent='+'+gain; })(performance.now());
+  }
+  setTimeout(()=>refreshStats(false), 200);
+}
+function closePraise(){ document.getElementById('modalLayer').classList.remove('show'); sfxTap(); }
+function sharePioneer(name){
+  const text=`🍜COCOiCOで新しい名店「${name}」を開拓した！\n大学前のうまい店、まだまだあるぞ。#COCOiCO`;
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(()=>toast('📋','自慢テキストをコピーしたよ！',true)).catch(()=>toast('📋',text.slice(0,18)+'…')); }
+  else { toast('📋','コピー対応外の環境です'); }
+}
+function whiteFlash(){
+  const f=document.createElement('div'); f.style.cssText='position:fixed;inset:0;background:#fff;z-index:95;opacity:0;pointer-events:none;transition:opacity 120ms';
+  document.body.appendChild(f); requestAnimationFrame(()=>{ f.style.opacity='.25'; setTimeout(()=>{ f.style.opacity='0'; setTimeout(()=>f.remove(),140);},120); });
+}
+
+/* ---------- Canvas 紙吹雪 & 火花（fxCanvas 1系統） ---------- */
+const fx=document.getElementById('fxCanvas'); const fxc=fx.getContext('2d'); let fxRAF=null, fxParts=[];
+function fxResize(){ fx.width=innerWidth; fx.height=innerHeight; }
+function confetti(){
+  if(reducedMotion()){ toast('🎉','おめでとう！'); return; }
+  fxResize(); fx.style.display='block';
+  const colors=["#FF6A2B","#FFC23C","#C0341C","#FF8A3D","#2E9E6B","#FFD25A"];
+  fxParts=[];
+  for(let i=0;i<90;i++){ fxParts.push({x:innerWidth/2+(Math.random()*120-60), y:innerHeight*0.42, vx:(Math.random()*2-1)*7, vy:-(6+Math.random()*9), g:0.28+Math.random()*0.1, rot:Math.random()*6, vr:(Math.random()*2-1)*0.3, w:7+Math.random()*6, h:10+Math.random()*8, c:colors[i%colors.length], gold:Math.random()<0.25, life:0}); }
+  if(fxRAF) cancelAnimationFrame(fxRAF);
+  const t0=performance.now();
+  (function loop(now){
+    fxc.clearRect(0,0,fx.width,fx.height); let alive=false;
+    for(const p of fxParts){
+      p.vy+=p.g; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr; p.life=(now-t0);
+      if(p.y<fx.height+40 && p.life<1800){ alive=true;
+        fxc.save(); fxc.translate(p.x,p.y); fxc.rotate(p.rot);
+        if(p.gold){ fxc.fillStyle="#FFD25A"; fxc.beginPath(); fxc.arc(0,0,3.5,0,6.3); fxc.fill(); }
+        else { fxc.fillStyle=p.c; fxc.fillRect(-p.w/2,-p.h/2,p.w,p.h); }
+        fxc.restore();
+      }
+    }
+    if(alive) fxRAF=requestAnimationFrame(loop); else { fxc.clearRect(0,0,fx.width,fx.height); fx.style.display='none'; fxParts=[]; }
+  })(t0);
+}
+function sparkBurst(){
+  if(reducedMotion()) return;
+  fxResize(); fx.style.display='block';
+  const cx=innerWidth/2, cy=Math.min(innerHeight*0.42, 320);
+  let parts=[]; for(let i=0;i<16;i++){ const a=Math.random()*6.28, sp=3+Math.random()*5; parts.push({x:cx,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,life:0,c:["#FFC23C","#FF6A2B","#FFD25A"][i%3]}); }
+  if(fxRAF) cancelAnimationFrame(fxRAF);
+  const t0=performance.now();
+  (function loop(now){
+    fxc.clearRect(0,0,fx.width,fx.height); let alive=false;
+    for(const p of parts){ p.vy+=0.18; p.x+=p.vx; p.y+=p.vy; p.life=now-t0;
+      if(p.life<700){ alive=true; fxc.globalAlpha=Math.max(0,1-p.life/700); fxc.fillStyle=p.c; fxc.beginPath(); fxc.arc(p.x,p.y,3,0,6.3); fxc.fill(); fxc.globalAlpha=1; } }
+    if(alive) fxRAF=requestAnimationFrame(loop); else { fxc.clearRect(0,0,fx.width,fx.height); fx.style.display='none'; }
+  })(t0);
+}
+addEventListener('resize', ()=>{ if(fx.style.display==='block') fxResize(); });
+
+/* =========================================================
+   町のご飯屋クイズ（炎コンボ + 称号"火入れ"）
+   ========================================================= */
+let curQuiz=null, combo=0;
+function renderQuiz(){
+  updateTitleBar();
+  let pool=QUIZ.filter((_,i)=>!store.quizSeen.includes(i));
+  if(pool.length===0){ store.quizSeen=[]; pool=QUIZ.slice(); }
+  const idx=QUIZ.indexOf(pool[Math.floor(Math.random()*pool.length)]);
+  const qid='q_'+pad2(idx);
+  curQuiz={idx, qid, q:QUIZ[idx], answered:false};
+  const st=quizStats(qid); const pts=pointsFor(st.p);
+  const stars = pts>=23?'★★★': (pts>=15?'★★☆':'★☆☆');
+  const badges=`<div class="qbadges">
+    <span class="qbadge">難易度 ${stars}</span>
+    <span class="qbadge">正解で +${pts}pt</span></div>`;
+  document.getElementById('quizCard').innerHTML=
+    `<div class="qnum">Q. 街のご飯屋クイズ</div>${badges}<div class="qtext">${esc(curQuiz.q.q)}</div>
+     <div class="qopts">${curQuiz.q.opts.map((o,i)=>`<button class="qopt tap" data-k="${'ABC'[i]}" onclick="answerQuiz(${i})">${esc(o)}</button>`).join('')}</div>`;
+}
+function answerQuiz(i){
+  if(curQuiz.answered) return; curQuiz.answered=true;
+  const correct=curQuiz.q.a; const btns=document.querySelectorAll('#quizCard .qopt');
+  btns.forEach((b,bi)=>{ b.disabled=true; if(bi===correct) b.classList.add('correct'); if(bi===i&&i!==correct) b.classList.add('wrong'); });
+  const ok=(i===correct);
+  const uid=currentUserId(); const qid=curQuiz.qid;
+  const p = quizStats(qid).p;                         // 付与前の集計（表示と一致）
+  const pts = pointsFor(p); const awarded = ok? pts : 0;
+  db.insert('quiz_attempts',{user_id:uid, question_id:qid, chosen_index:i, is_correct:ok?1:0, awarded_points:awarded, created_at:Date.now()});
+  db.update('quiz_questions', qid, {base_points: pointsFor(quizStats(qid).p)});   // p更新→配点再計算
+  if(!store.quizSeen.includes(curQuiz.idx)) store.quizSeen.push(curQuiz.idx);
+  const before=currentTitle().t;
+  if(ok){ addPoints(uid, awarded); combo++; } else { combo=0; }
+  syncTitle(uid);                                      // quiz_correct/title を source of truth から再集計
+  const after=currentTitle().t;
+  sfxQuiz(ok, combo);
+  const cv=document.getElementById('comboV'); cv.textContent=combo;
+  if(ok&&combo>1){ cv.style.transform='skewX(-6deg) scale(1.3)'; setTimeout(()=>cv.style.transform='skewX(-6deg)',200); }
+  const linked=db.first('restaurants',r=>r.name===curQuiz.q.link);
+  document.getElementById('quizCard').insertAdjacentHTML('beforeend',
+    `<div class="explain"><b>${ok?('⭕ 正解！ +'+pts+'ポイント'+(pts>=23?'（難問ボーナス）':'')+(combo>1?` 🔥${combo}コンボ！`:'')):'❌ 残念！'}</b><br>${esc(curQuiz.q.exp)}
+      <div class="lead-next">👇 次はこの店に行ってみよう！</div></div>
+     ${linked?restoCard(linked,null,0):''}
+     <button class="btn sm tap" onclick="renderQuiz()" style="margin-top:8px;">次の問題へ ▶</button>`);
+  if(ok&&before!==after){ sfxRank(); rankUpFx(); showPraise('👑','称号ランクアップ！',`おめでとう！新しい称号<br><b style="color:var(--secondary);font-size:18px;">「${after}」</b><br>を獲得しました！`,0,0,0,'',false); }
+  updateTitleBar(); refreshStats(false);
+  document.querySelector('#quizCard .explain').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function rankUpFx(){ confetti(); document.body.animate?document.body.animate([{filter:'saturate(1.4)'},{filter:'none'}],{duration:600}):0; }
+function updateTitleBar(){
+  const cur=currentTitle(); const next=TITLES.find(t=>t.n>store.quizCorrect);
+  document.getElementById('quizTitle').textContent=cur.t;
+  document.getElementById('quizCorrect').textContent=store.quizCorrect;
+  document.getElementById('quizNext').textContent=next?(next.n-store.quizCorrect):0;
+  document.getElementById('comboV').textContent=combo;
+}
+
+/* =========================================================
+   隠れ家喫茶店
+   ========================================================= */
+let cafeFilter=new Set();
+function renderCafe(){
+  const tags=["読書向き","完全禁煙","長居しやすい","静か","電源あり","Wi-Fi","レトロ"];
+  const ic={"読書向き":"📖","完全禁煙":"🚭","長居しやすい":"🛋","静か":"🤫","電源あり":"🔌","Wi-Fi":"📶","レトロ":"🕰"};
+  document.getElementById('cafeTags').innerHTML =
+    `<div class="chip tap ${cafeFilter.size===0?'sel':''}" onclick="clearCafe()">☕ すべて</div>`+
+    tags.map(t=>`<div class="chip tap ${cafeFilter.has(t)?'sel':''}" onclick="toggleCafe('${t}')">${ic[t]||''} ${t}</div>`).join('');
+  let list=db.where('restaurants',{cafe:1});
+  if(cafeFilter.size>0) list=list.filter(r=>[...cafeFilter].every(t=>(r.cafe_tags||r.cafeTags||[]).includes(t)));
+  const box=document.getElementById('cafeList');
+  if(list.length===0){ box.innerHTML='<div class="empty">条件に合う喫茶店はまだありません☕<br>「＋登録」から隠れ家を追加してみよう。</div>'; return; }
+  box.innerHTML=list.map((r,i)=>cafeCard(r,i*90)).join('');
+}
+function clearCafe(){ cafeFilter.clear(); renderCafe(); }
+function toggleCafe(t){ if(cafeFilter.has(t)) cafeFilter.delete(t); else cafeFilter.add(t); renderCafe(); }
+function cafeCard(r,delay){
+  const tags=(r.cafe_tags||r.cafeTags||[]).map(t=>`<span class="badge b-yum">#${t}</span>`).join('');
+  const mine = (r.created_by && r.created_by===currentUserId()) || r.userAdded;
+  const favOn = r.id? isFavId(r.id) : false;
+  const favClick = r.id? `toggleFavId('${r.id}',this)` : `toggleFav('${esc(r.name).replace(/'/g,'')}',this)`;
+  return `<div class="resto cafe-card ${rarityClass(r.niche)}" style="--d:${delay||0}ms">
+    <span class="rarity"></span>
+    <div class="rtop"><div class="emoji">${r.emoji}</div>
+      <div style="flex:1;min-width:0;"><h3>${esc(r.name)}</h3>
+        <div class="meta">📍 大学から徒歩${r.dist}分 ・ ${r.price} ${regByHtml(r)}</div>
+        <div class="badges">${tags}${mine?'<span class="badge b-new">✨ あなたの発見</span>':''}</div></div></div>
+    <p class="point">💬 ${esc(r.point)}</p>
+    <div class="links">
+      <button class="favbtn tap ${favOn?'on':''}" onclick="${favClick}" title="お気に入り">${favOn?'❤️':'🤍'}</button>
+      <a class="l-hp tap" href="${hpUrl(r.name)}" target="_blank" rel="noopener">🔥 ホットペッパー</a>
+      <a class="l-tb tap" href="${tbUrl(r.name)}" target="_blank" rel="noopener">食べログ</a></div>
+    ${cooccurHtml(r.id)}
+  </div>`;
+}
+
+/* =========================================================
+   初期化
+   ========================================================= */
+function initTaps(){
+  // プリン・タップのSE（タップ可能要素のみ）
+  document.addEventListener('pointerdown', e=>{
+    const t=e.target.closest('.tap'); if(t) sfxTap();
+  }, true);
+}
+function initScrollHeader(){
+  let ticking=false;
+  addEventListener('scroll', ()=>{ if(ticking) return; ticking=true; requestAnimationFrame(()=>{ document.getElementById('noren').classList.toggle('shrunk', scrollY>16); ticking=false; }); }, {passive:true});
+}
+function initSplash(){
+  const sp=document.getElementById('splash');
+  const hide=()=>{ sp.classList.add('gone'); };
+  setTimeout(hide, 1300);
+  sp.addEventListener('click', hide);
+}
+function init(){
+  const firstTime = metaGet('seeded')!=='1';
+  bootStep2();                                  // DB初期化 → 擬似コミュニティ生成 → ゲスト確保 → Step1移行
+  document.getElementById('muteBtn').textContent = muted?'🔇':'🔊';
+  document.getElementById('greet').textContent = firstTime ? 'はじめまして！今日の一軒、見つけにいこう。' : 'おかえり！次の一軒、開拓しにいこう🔥';
+  buildRegChips();
+  refreshStats(true);
+  initTaps(); initScrollHeader(); initSplash();
+}
+init();
+</script>
+
+<!-- =======================================================================
+  Step3への橋渡し: 本番クラウドDB（Supabase / PostgreSQL）への移行スキーマ
+  ローカルの LocalDB(localStorage) と列名は1:1対応。差し替えれば「全ユーザー
+  共有のリアルDB」になります（読取は共有、書込は本人のみ＝RLSで保護）。
+  対応規約: cafe/is_seed/is_correct は ローカルINTEGER(0/1) ↔ 本番 boolean、
+  配列列は ローカル生配列 ↔ 本番 jsonb、id は ローカルTEXT ↔ 本番 uuid。
+  予約語回避: ローカル time → 本番 time_slots、ローカル q → 本番 question_text。
+
+  create extension if not exists pgcrypto;
+
+  create table users (
+    id uuid primary key default gen_random_uuid(),
+    handle text unique not null,
+    avatar text, points int default 0, quiz_correct int default 0,
+    title text default 'グルメ見習い', ab_group text check (ab_group in ('A','B')),
+    is_seed boolean default false,
+    created_at timestamptz default now(), last_active_at timestamptz default now()
+  );
+  create table restaurants (
+    id uuid primary key default gen_random_uuid(),
+    name text unique not null, emoji text,
+    mood jsonb, dist int, price text, reserve text, smoke text, niche text,
+    yum jsonb, owner text, atmos jsonb, people jsonb, companion jsonb,
+    time_slots jsonb, brk jsonb, point text,
+    cafe boolean default false, cafe_tags jsonb,
+    created_by uuid references users(id), is_seed boolean default false,
+    created_at timestamptz default now()
+  );
+  create table favorites (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references users(id), restaurant_id uuid references restaurants(id),
+    created_at timestamptz default now(),
+    unique(user_id, restaurant_id)
+  );
+  create table quiz_questions (
+    id text primary key, question_text text, opts jsonb, answer_index int,
+    exp text, answer_restaurant_id uuid references restaurants(id), base_points int
+  );
+  create table quiz_attempts (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references users(id), question_id text references quiz_questions(id),
+    chosen_index int, is_correct boolean, awarded_points int,
+    created_at timestamptz default now()
+  );
+  create table roulette_spins (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references users(id), restaurant_id uuid references restaurants(id),
+    created_at timestamptz default now()
+  );
+  create table ab_events (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid references users(id), ab_group text, event_type text check (event_type in ('impression','reengage')),
+    created_at timestamptz default now()
+  );
+
+  create index idx_fav_user on favorites(user_id);
+  create index idx_fav_resto on favorites(restaurant_id);
+  create index idx_qa_q_correct on quiz_attempts(question_id, is_correct);
+  create index idx_ab_group_type on ab_events(ab_group, event_type);
+  create index idx_resto_niche on restaurants(niche);
+
+  -- RLS: 読取は全員共有 / 書込は本人のみ。擬似データは is_seed=true でサービスロール投入。
+  alter table favorites enable row level security;
+  create policy fav_read  on favorites for select using (true);
+  create policy fav_write on favorites for insert with check (auth.uid() = user_id);
+  create policy fav_del   on favorites for delete using (auth.uid() = user_id);
+  alter table restaurants enable row level security;
+  create policy resto_read on restaurants for select using (true);
+  create policy resto_ins  on restaurants for insert with check (auth.uid() = created_by);
+  create policy resto_upd  on restaurants for update using (auth.uid() = created_by);
+
+  -- 機能2: お気に入りランキング（ローカル DASH_metrics と意味的に一致）
+  --   select r.id, r.name, count(f.*) fav from restaurants r
+  --   left join favorites f on f.restaurant_id=r.id group by r.id order by fav desc limit 10;
+  -- 機能3: 問別正答率と期待値配点
+  --   select question_id, avg(case when is_correct then 1 else 0 end) p,
+  --          round(5+25*(1-avg(case when is_correct then 1 else 0 end))) pts
+  --   from quiz_attempts group by question_id;
+  -- 機能5: A/B 再エンゲージ率
+  --   select ab_group,
+  --     count(*) filter (where event_type='impression') n,
+  --     count(*) filter (where event_type='reengage') x
+  --   from ab_events group by ab_group;
+======================================================================= -->
+</body>
+</html>

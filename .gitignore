@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# 念のため: 別の秘密ファイルはコミットしない
+.env
+.env.*
+secrets*.json
